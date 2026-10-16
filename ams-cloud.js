@@ -292,9 +292,56 @@ const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(S
      }catch(e){alert('Error: '+e.message)}
    },
    manageOperators:async function(){
-     if(this.role!=='admin')return;
-     const received=await http('operator_list',{},this.token);
-     const list=received.operators||[];
+  if(!this.ready || !this.configured){
+    alert('La conexión con Supabase V7 no está activa.');
+    return;
+  }
+
+  let received;
+
+  try {
+    if(this.role==='admin' && this.token){
+      try {
+        received=await http('operator_list',{},this.token);
+      } catch(e) {
+        if(!String(e.message||e).includes('SESION_NO_AUTORIZADA')){
+          throw e;
+        }
+      }
+    }
+
+    if(!received){
+      const sesion=currentSession();
+
+      if(sesion?.role!=='admin'){
+        alert('Debes iniciar sesión como ADMINISTRADOR.');
+        return;
+      }
+
+      const pin=prompt('Ingresa nuevamente tu PIN de ADMINISTRADOR:');
+      if(pin===null)return;
+
+      const login=await http('admin_login',{pin});
+
+      this.token=login.token;
+      this.role='admin';
+
+      sessionStorage.setItem(admKey,login.token);
+      sessionStorage.setItem(
+        AMS_SESSION_KEY,
+        JSON.stringify({...sesion,cloud:true})
+      );
+
+      received=await http('operator_list',{},this.token);
+      this.draw();
+    }
+
+  } catch(e) {
+    alert('ERROR DE USUARIOS: '+(e.message||String(e)));
+    return;
+  }
+
+  const list=received.operators||[];
      if(!list.length)return alert('No se encontraron responsables configurados.');
      const dialog=document.createElement('dialog');dialog.style.cssText='width:min(540px,95vw);max-width:95vw;padding:24px;border:0;border-radius:12px';
      const optionHtml=list.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
