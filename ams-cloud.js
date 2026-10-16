@@ -76,7 +76,7 @@
      if(session?.role==='admin'&&session?.cloud===true){this.token=sessionStorage.getItem(admKey)||'';this.role=this.token?'admin':''}
      else if(session?.role==='operator'&&session?.cloud===true){this.token=localStorage.getItem(devKey)||'';this.role=this.token?'operator':''}
      if(!this.token){sessionStorage.removeItem(AMS_SESSION_KEY);showLoginAMS()}
-     else {document.getElementById('amsLogin').hidden=true;updateSessionHeader();this.start()}
+     else {document.getElementById('amsLogin').hidden=true;updateSessionHeader();render();this.start()}
      this.status='Base Supabase configurada';this.draw();
    },
    injectUI:function(){
@@ -123,7 +123,7 @@
        this.token=token;this.role=role;
        sessionStorage.setItem(AMS_SESSION_KEY,JSON.stringify({name,guard:role==='admin'?'':guard,shift:role==='admin'?'':shift,role,cloud:true,started:new Date().toISOString()}));
        document.getElementById('amsLogin').hidden=true;document.getElementById('amsLoginPin').value='';
-       updateSessionHeader();this.start();this.status='Sesión iniciada';this.draw();
+       updateSessionHeader();render();this.start();this.status='Sesión iniciada';this.draw();
      }catch(e){err.textContent=e.message||String(e)}
    },
    start:function(){
