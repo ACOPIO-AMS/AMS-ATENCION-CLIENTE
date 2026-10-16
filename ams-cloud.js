@@ -8,7 +8,7 @@
  const ALL=[...ARRAY_KEYS,...OBJECT_KEYS];
  const DB='ams-cloud-outbox-v1',JOURNAL='ams-cloud-write-journal-v1';
  const vKey='ams-cloud-versions-v1',cKey='ams-cloud-cursor-v1';
- const devKey='ams-cloud-device-token-v1',admKey='ams-cloud-admin-token-v1';
+ const devKey='ams-cloud-device-token-v1',admKey='ams-cloud-admin-token-v1',opKey='ams-cloud-operator-session-v1';
  const snap=x=>JSON.parse(JSON.stringify(x));
  const uuid=()=>crypto.randomUUID();
  function tidyIds(obj){
@@ -74,7 +74,7 @@
      this.injectUI();
      const session=currentSession();
      if(session?.role==='admin'&&session?.cloud===true){this.token=sessionStorage.getItem(admKey)||'';this.role=this.token?'admin':''}
-     else if(session?.role==='operator'&&session?.cloud===true){this.token=localStorage.getItem(devKey)||'';this.role=this.token?'operator':''}
+     else if(session?.role==='operator'&&session?.cloud===true){this.token=sessionStorage.getItem(opKey)||'';this.role=this.token?'operator':''}
      if(!this.token){sessionStorage.removeItem(AMS_SESSION_KEY);showLoginAMS()}
      else {document.getElementById('amsLogin').hidden=true;updateSessionHeader();render();this.start()}
      this.status='Base Supabase configurada';this.draw();
@@ -87,11 +87,38 @@
      document.getElementById('amsCloudTools').onclick=()=>this.tools();
      document.getElementById('amsCloudConflicts').onclick=()=>this.conflicts();
      let input=document.createElement('div');input.className='field';input.id='amsLoginEnrollWrap';
-     input.innerHTML='<label>ACTIVACIÓN DEL DISPOSITIVO (solo primer uso)</label><input id="amsEnrollCode" autocomplete="off" maxlength="12" placeholder="Código entregado por el administrador"><small>Después de activarlo, este dispositivo no requiere PIN.</small>';
+     input.innerHTML='<label>ACTIVACIÓN DEL DISPOSITIVO (solo primer uso)</label><input id="amsEnrollCode" autocomplete="off" maxlength="12" placeholder="Código entregado por el administrador"><small>El dispositivo se activa solo una vez; la contraseña PERSONAL siempre será obligatoria al entrar.</small>';
      document.getElementById('amsLoginPinWrap').insertAdjacentElement('afterend',input);
+     const passwordWrap=document.createElement('div');passwordWrap.className='field';passwordWrap.id='amsOperatorPasswordWrap';
+     passwordWrap.innerHTML='<label>CONTRASEÑA PERSONAL DEL OPERARIO *</label><input id="amsOperatorPassword" type="password" minlength="8" maxlength="64" autocomplete="current-password" placeholder="Contraseña asignada por el administrador">';
+     input.insertAdjacentElement('afterend',passwordWrap);
      const old=window.updateLoginRoleAMS;
-     window.updateLoginRoleAMS=function(){old();const admin=val('amsLoginName')==='ADMINISTRADOR';input.hidden=admin||!!localStorage.getItem(devKey);const help=document.getElementById('amsPinHelp'),caption=document.getElementById('amsLoginCaption');if(help)help.textContent=admin?'PIN del administrador verificado por Supabase (6 a 8 dígitos).':'Sin PIN para operarios; nuevo dispositivo requiere una activación única.';if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO DE RESPONSABLE · SIN PIN'};
+     window.updateLoginRoleAMS=function(){
+       old();const admin=val('amsLoginName')==='ADMINISTRADOR';
+       input.hidden=admin||!!localStorage.getItem(devKey);
+       passwordWrap.hidden=admin;
+       const pw=document.getElementById('amsOperatorPassword');pw.required=!admin;
+       if(admin)pw.value='';
+       const help=document.getElementById('amsPinHelp'),caption=document.getElementById('amsLoginCaption');
+       if(help)help.textContent=admin?'PIN del administrador verificado por Supabase.':'Cada responsable debe ingresar su contraseña personal en cada nueva sesión. Un dispositivo activado NO reemplaza la contraseña.';
+       if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO DE RESPONSABLE · CONTRASEÑA PERSONAL OBLIGATORIA';
+     };
      updateLoginRoleAMS();
+     this.refreshOperators();
+   },
+   refreshOperators:async function(){
+     try{
+       const r=await http('operator_catalog');
+       const names=(r.names||[]).filter(x=>typeof x==='string'&&x!=='ADMINISTRADOR');
+       AMS_OPERATORS.splice(0,AMS_OPERATORS.length,...names);
+       const select=document.getElementById('amsLoginName');
+       if(select){
+         const old=select.value;
+         select.innerHTML='<option value="">Seleccione responsable</option>'+names.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('')+'<option value="ADMINISTRADOR">ADMINISTRADOR</option>';
+         if([...names,'ADMINISTRADOR'].includes(old))select.value=old;
+         updateLoginRoleAMS();
+       }
+     }catch(e){console.warn('No se pudo actualizar catálogo de operarios:',e)}
    },
    draw:async function(){
      if(!configured)return;
@@ -99,7 +126,14 @@
      const el=document.getElementById('amsCloudStatus');if(el)el.textContent=`${navigator.onLine?'●':'○'} ${this.status} · Pendientes: ${this.pending} · Conflictos: ${this.blocked}`;
      const t=document.getElementById('amsCloudTools'),c=document.getElementById('amsCloudConflicts');if(t)t.hidden=this.role!=='admin';if(c)c.hidden=!this.blocked;
    },
-   stop:function(){clearInterval(this.timer);this.token='';this.role='';sessionStorage.removeItem(admKey);this.status='Sesión cerrada';this.draw()},
+   stop:async function(){
+     clearInterval(this.timer);
+     const currentToken=this.token;
+     this.token='';this.role='';
+     sessionStorage.removeItem(admKey);sessionStorage.removeItem(opKey);
+     this.status='Sesión cerrada';this.draw();
+     if(currentToken&&navigator.onLine){try{await http('logout',{},currentToken)}catch(e){console.warn('El token expirará del lado servidor',e)}}
+   },
    loginFromForm:async function(){
      if(!this.ready){document.getElementById('amsLoginError').textContent='La base todavía no está preparada.';return}
      const name=val('amsLoginName'),guard=val('amsLoginGuard'),shift=val('amsLoginShift'),pin=val('amsLoginPin');
@@ -112,12 +146,19 @@
          sessionStorage.setItem(admKey,token);
        }else{
          if(!AMS_OPERATORS.includes(name)||!['A','B','C'].includes(guard)||!['Día','Noche'].includes(shift))throw Error('Selecciona responsable, guardia y turno.');
-         token=localStorage.getItem(devKey);
-         if(!token){
-           const code=val('amsEnrollCode');if(!code)throw Error('Necesitas activar este dispositivo una sola vez (solicita un código al administrador).');
+         const password=document.getElementById('amsOperatorPassword')?.value||'';
+         if(password.length<8||password.length>64)throw Error('La contraseña personal debe tener de 8 a 64 caracteres.');
+         let deviceToken=localStorage.getItem(devKey)||'';
+         if(!deviceToken){
+           const code=val('amsEnrollCode');if(!code)throw Error('Activa primero este dispositivo con el código del administrador.');
            const activated=await http('device_activate',{code,label:navigator.userAgent.slice(0,80)});
-           token=activated.token;localStorage.setItem(devKey,token);
+           deviceToken=activated.token;localStorage.setItem(devKey,deviceToken);
          }
+         // El token del dispositivo SOLO acredita el equipo. Cada usuario
+         // debe entregar SU PROPIA contraseña para obtener una sesión personal.
+         const login=await http('operator_login',{name,password,deviceToken});
+         token=login.token;sessionStorage.setItem(opKey,token);
+         document.getElementById('amsOperatorPassword').value='';
          role='operator';
        }
        this.token=token;this.role=role;
@@ -143,10 +184,10 @@
        for(const [key,data] of cur){
          if(entity==='cargo'&&key.startsWith('TMP-'))continue;
          if(!old.has(key)||JSON.stringify(old.get(key))!==JSON.stringify(data)){
-           changes.push({kind:'mutation',opId:uuid(),entity,key,data,deleted:false,createdAt:Date.now()+changes.length});
+           changes.push({kind:'mutation',opId:uuid(),entity,key,data,deleted:false,actor:currentSession()?.name||'',createdAt:Date.now()+changes.length});
          }
        }
-       for(const [key] of old){if(!cur.has(key)&&!(entity==='cargo'&&key.startsWith('TMP-')))changes.push({kind:'mutation',opId:uuid(),entity,key,data:{},deleted:true,createdAt:Date.now()+changes.length})}
+       for(const [key] of old){if(!cur.has(key)&&!(entity==='cargo'&&key.startsWith('TMP-')))changes.push({kind:'mutation',opId:uuid(),entity,key,data:{},deleted:true,actor:currentSession()?.name||'',createdAt:Date.now()+changes.length})}
      }
      if(!changes.length)return;
      // Registro síncrono previo a IndexedDB para proteger los cambios si la pestaña se cierra inmediatamente.
@@ -172,7 +213,7 @@
      syncCargo();const type=cargoType,driver=type==='PR'?[...new Set(cargoLines.map(x=>x.providerName).filter(Boolean))].join(' / '):(val('cargoDriver')||'');
      const record={number:'',docType:type,name:currentSession()?.name||'',driver,providerDni:type==='PR'?cargoProviderDraft.dni:'',providerName:type==='PR'?cargoProviderDraft.name:'',date:now(),updated:now(),materialType:type==='GE'?cargoMaterialType:'',lines:cargoLines.map(x=>({...x})),guard:currentSession()?.guard||'—',shift:currentSession()?.shift||'—',status};
      const opId=uuid(),temp='TMP-'+opId.slice(0,8).toUpperCase();record.number=temp;
-     await dbPut(this.db,{kind:'cargo_create',opId,tempKey:temp,payload:{...record,number:''},createdAt:Date.now()});
+     await dbPut(this.db,{kind:'cargo_create',opId,tempKey:temp,payload:{...record,number:''},actor:currentSession()?.name||'',createdAt:Date.now()});
      state.cargo.unshift(record);cargoLastSaved=temp;editingCargoNumber='';cargoLines=[cargoReset()];cargoMaterialType='';cargoProviderDraft={dni:'',name:''};
      addLog('Cargo '+temp+' pendiente de numeración central · '+status);
      this.status='Cargo guardado localmente; pendiente de número oficial';this.draw();this.sync(false);
@@ -184,8 +225,10 @@
      try{
        await this.captureChain;
        const rows=await dbAll(this.db);
+       let waitingOtherUser=0;
        for(const row of rows){
          if(row.blocked)continue;
+         if(row.actor && row.actor!==currentSession()?.name){waitingOtherUser++;continue;}
          if(row.kind==='cargo_create'){
            const res=await http('cargo_create',{opId:row.opId,payload:row.payload},this.token);
            if(res?.ok){
@@ -224,13 +267,13 @@
        }
        if(changed){this.saveCache();if(manual&&!document.querySelector('dialog[open]')&&!document.activeElement?.matches('input,select,textarea'))render()}
        else{localStorage.setItem(vKey,JSON.stringify(this.version));localStorage.setItem(cKey,String(this.cursor))}
-       this.status='SINCRONIZADO · '+new Date().toLocaleTimeString('es-PE');
-     }catch(e){this.status='PENDIENTE / ERROR: '+(e.message||String(e));if(/SESION_NO_AUTORIZADA/.test(this.status)){this.token='';showLoginAMS()}}
+       this.status=waitingOtherUser?'PENDIENTES DE OTRO RESPONSABLE · inicie su sesión para enviar':'SINCRONIZADO · '+new Date().toLocaleTimeString('es-PE');
+     }catch(e){this.status='PENDIENTE / ERROR: '+(e.message||String(e));if(/SESION_NO_AUTORIZADA/.test(this.status)){this.token='';this.role='';sessionStorage.removeItem(admKey);sessionStorage.removeItem(opKey);sessionStorage.removeItem(AMS_SESSION_KEY);showLoginAMS()}}
      finally{this.busy=false;this.draw()}
    },
    tools:async function(){
      if(this.role!=='admin')return;
-     const option=prompt('ADMINISTRACIÓN DE BASE\n1 = Generar código para un dispositivo nuevo\n2 = Importar datos de V6 local a Supabase (solo una vez)\n3 = Ver y revocar dispositivos\n4 = Descargar copia JSON actual\nElige 1, 2, 3 o 4:','1');
+     const option=prompt('ADMINISTRACIÓN DE BASE\n1 = Generar código para un dispositivo nuevo\n2 = Importar datos de V6 local a Supabase (solo una vez)\n3 = Ver y revocar dispositivos\n4 = Descargar copia JSON actual\n5 = USUARIOS: definir claves, bloquear o habilitar\nElige 1, 2, 3, 4 o 5:','1');
      try{
        if(option==='1'){
          const r=await http('device_issue',{},this.token);
@@ -241,11 +284,61 @@
          const msg=r.devices.map((x,i)=>`${i+1}. ${x.device_id} · ${x.label||''} ${x.revoked_at?'REVOCADO':'ACTIVO'}`).join('\n');
          const selected=prompt('DISPOSITIVOS:\n'+msg+'\n\nEscribe NÚMERO para revocar o cancelar:','');
          const d=r.devices[Number(selected)-1];if(d&&confirm('¿Revocar acceso del dispositivo '+d.device_id+'?'))await http('device_revoke',{deviceId:d.device_id},this.token);
-       }else if(option==='4'){
+       }else if(option==='5')await this.manageOperators();
+       else if(option==='4'){
          const a=document.createElement('a'),blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});
          a.href=URL.createObjectURL(blob);a.download='AMS_ACOPIO_RESPALDO_LOCAL_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2500);
        }
      }catch(e){alert('Error: '+e.message)}
+   },
+   manageOperators:async function(){
+     if(this.role!=='admin')return;
+     const received=await http('operator_list',{},this.token);
+     const list=received.operators||[];
+     if(!list.length)return alert('No se encontraron responsables configurados.');
+     const dialog=document.createElement('dialog');dialog.style.cssText='width:min(540px,95vw);max-width:95vw;padding:24px;border:0;border-radius:12px';
+     const optionHtml=list.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
+     dialog.innerHTML='<h3>USUARIOS · CONTRASEÑAS PERSONALES</h3><p style="font-size:12px">El administrador crea o restablece las claves. Cada responsable debe escribir su contraseña al iniciar sesión, incluso en dispositivos ya activados.</p>'+
+       '<div style="border:1px solid #d8e3ed;border-radius:8px;padding:12px;margin-bottom:12px"><b>➕ Agregar nuevo usuario</b><input id="amsOpNewName" maxlength="90" placeholder="Nombres y apellidos" style="width:100%;margin:8px 0"><input id="amsOpInitialPassword" type="password" maxlength="64" placeholder="Contraseña inicial (letras y números)" style="width:100%;margin:4px 0 8px"><button type="button" class="btn" id="amsOpCreate">Crear usuario</button></div>'+
+       '<label>Responsable</label><select id="amsOpName">'+optionHtml+'</select>'+
+       '<p id="amsOpState" style="font-size:12px;font-weight:650"></p>'+
+       '<label>Nueva contraseña (8 a 64 caracteres, letras y números)</label><input id="amsOpNewPassword" type="password" autocomplete="new-password" maxlength="64" placeholder="Nueva contraseña" style="width:100%;margin:6px 0 12px">'+
+       '<div style="display:flex;flex-wrap:wrap;gap:9px"><button type="button" class="btn" id="amsOpSave">Guardar nueva clave</button><button type="button" class="btn secondary" id="amsOpToggle">Bloquear usuario</button><button type="button" class="btn secondary" id="amsOpClose">Cerrar</button></div>'+
+       '<p id="amsOpFeedback" role="status" style="font-size:12px;margin-top:10px"></p>';
+     document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+     const $=id=>dialog.querySelector('#'+id),current=()=>list.find(x=>x.name===$('amsOpName').value);
+     const draw=()=>{const x=current();$('amsOpState').textContent=(x?.hasPassword?'CLAVE CONFIGURADA':'SIN CLAVE ASIGNADA')+' · '+(x?.disabled?'BLOQUEADO':'HABILITADO');$('amsOpToggle').textContent=x?.disabled?'Habilitar usuario':'Bloquear usuario';$('amsOpNewPassword').value='';$('amsOpFeedback').textContent=''};
+     $('amsOpName').onchange=draw;draw();
+     $('amsOpCreate').onclick=async()=>{
+       const name=$('amsOpNewName').value.trim().toUpperCase(),password=$('amsOpInitialPassword').value;
+       if(!/^[\p{L}\p{M} .'-]{5,90}$/u.test(name)||name==='ADMINISTRADOR'||password.length<8||password.length>64||!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(password)||!/\d/.test(password)){
+         $('amsOpFeedback').textContent='Nombre válido y contraseña de 8 a 64 caracteres con letras y números.';return;
+       }
+       if(!confirm('¿Registrar '+name+' y asignar su contraseña?'))return;
+       try{
+         await http('operator_create',{name,password},this.token);
+         list.push({name,hasPassword:true,disabled:false});
+         list.sort((a,b)=>a.name.localeCompare(b.name,'es'));
+         $('amsOpName').innerHTML=list.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
+         $('amsOpName').value=name;
+         $('amsOpNewName').value='';$('amsOpInitialPassword').value='';draw();
+         $('amsOpFeedback').textContent='Usuario creado y contraseña configurada en Supabase.';
+       }catch(e){$('amsOpFeedback').textContent='Error: '+e.message}
+     };
+     $('amsOpClose').onclick=()=>dialog.close();
+     $('amsOpSave').onclick=async()=>{
+       const selected=current(),password=$('amsOpNewPassword').value;
+       if(!selected||password.length<8||password.length>64||!/[A-Za-z]/.test(password)||!/\d/.test(password))return $('amsOpFeedback').textContent='La clave requiere 8 a 64 caracteres, al menos una letra y un número.';
+       if(!confirm('¿Asignar / restablecer la contraseña de '+selected.name+'? Se cerrarán todas sus sesiones abiertas.'))return;
+       try{await http('operator_set_password',{name:selected.name,password},this.token);selected.hasPassword=true;selected.disabled=false;draw();$('amsOpFeedback').textContent='Clave guardada en Supabase. Entrégala al usuario por un medio privado.'}
+       catch(e){$('amsOpFeedback').textContent='Error: '+e.message}
+     };
+     $('amsOpToggle').onclick=async()=>{
+       const selected=current(),disabled=!selected.disabled;
+       if(!selected||!confirm((disabled?'¿Bloquear':'¿Habilitar')+' a '+selected.name+'?'))return;
+       try{await http('operator_set_disabled',{name:selected.name,disabled},this.token);selected.disabled=disabled;draw();$('amsOpFeedback').textContent=disabled?'Usuario bloqueado y sus sesiones revocadas.':'Usuario habilitado.'}
+       catch(e){$('amsOpFeedback').textContent='Error: '+e.message}
+     };
    },
    importLegacy:async function(){
      const raw=localStorage.getItem('ams-demo-v4');if(!raw)return alert('No hay datos del prototipo V6 en este navegador.');
