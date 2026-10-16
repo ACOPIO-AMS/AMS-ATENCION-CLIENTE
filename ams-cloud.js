@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  const cfg=window.AMS_CONFIG||{};
- const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api\/?$/.test(String(cfg.apiUrl||''));
+const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(String(cfg.apiUrl||''));
  const ARRAY_KEYS=['people','guides','requests','cargo','services','users','sacks','logs','cleanings','inventoryMoves'];
  const OBJECT_KEYS=['rooms','inventory','reservations'];
  const ALL=[...ARRAY_KEYS,...OBJECT_KEYS];
