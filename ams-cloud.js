@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  const cfg=window.AMS_CONFIG||{};
-const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(String(cfg.apiUrl||''));
+ const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(String(cfg.apiUrl||''));
  const ARRAY_KEYS=['people','guides','requests','cargo','services','users','sacks','logs','cleanings','inventoryMoves'];
  const OBJECT_KEYS=['rooms','inventory','reservations'];
  const ALL=[...ARRAY_KEYS,...OBJECT_KEYS];
@@ -95,22 +95,33 @@ const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(S
      const old=window.updateLoginRoleAMS;
      window.updateLoginRoleAMS=function(){
        old();const admin=val('amsLoginName')==='ADMINISTRADOR';
-    input.hidden=true;
-
-document.getElementById('amsLoginGuardWrap').hidden=true;
-document.getElementById('amsLoginShiftWrap').hidden=true;
-
-document.getElementById('amsLoginGuard').required=false;
-document.getElementById('amsLoginShift').required=false;
+       input.hidden=true;
+       for(const id of ['amsLoginGuardWrap','amsLoginShiftWrap'])document.getElementById(id).hidden=true;
+       document.getElementById('amsLoginGuard').required=false;
+       document.getElementById('amsLoginShift').required=false;
        passwordWrap.hidden=admin;
        const pw=document.getElementById('amsOperatorPassword');pw.required=!admin;
        if(admin)pw.value='';
        const help=document.getElementById('amsPinHelp'),caption=document.getElementById('amsLoginCaption');
-       if(help)help.textContent=admin?'PIN del administrador verificado por Supabase.':'Cada responsable debe ingresar su contraseña personal en cada nueva sesión. Un dispositivo activado NO reemplaza la contraseña.';
-       if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO AL SISTEMA · USUARIO Y CONTRASEÑA';
+       if(help)help.textContent=admin?'PIN del administrador verificado por Supabase.':'Cada responsable ingresa con su propia contraseña.';
+       if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO · USUARIO Y CONTRASEÑA';
      };
      updateLoginRoleAMS();
      this.refreshOperators();
+   },
+   lookupCatalog:async function(kind,identifier){
+     if(!configured||!this.token||!this.ready)return null;
+     if(!['dni','ruc'].includes(kind)||!/^\d{8,11}$/.test(identifier))return null;
+     const url=String(cfg.catalogUrl||'');
+     if(!/^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/ams-consultas\/?$/.test(url))return null;
+     const response=await fetch(url,{
+       method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+this.token},
+       body:JSON.stringify({tipo:kind,valor:identifier})
+     });
+     if(response.status===404)return null;
+     const data=await response.json();
+     if(!response.ok||!data.ok)throw Error(data.error||'Error de consulta');
+     return data.result||null;
    },
    refreshOperators:async function(){
      try{
@@ -151,11 +162,10 @@ document.getElementById('amsLoginShift').required=false;
          const resp=await http('admin_login',{pin});token=resp.token;role='admin';
          sessionStorage.setItem(admKey,token);
        }else{
-         if(!AMS_OPERATORS.includes(name))
-  throw Error('Selecciona un usuario válido.');
+         if(!AMS_OPERATORS.includes(name))throw Error('Selecciona un usuario válido.');
          const password=document.getElementById('amsOperatorPassword')?.value||'';
          if(password.length<8||password.length>64)throw Error('La contraseña personal debe tener de 8 a 64 caracteres.');
-        const login=await http('operator_login',{name,password});
+         const login=await http('operator_login',{name,password});
          token=login.token;sessionStorage.setItem(opKey,token);
          document.getElementById('amsOperatorPassword').value='';
          role='operator';
@@ -291,56 +301,20 @@ document.getElementById('amsLoginShift').required=false;
      }catch(e){alert('Error: '+e.message)}
    },
    manageOperators:async function(){
-  if(!this.ready || !this.configured){
-    alert('La conexión con Supabase V7 no está activa.');
-    return;
-  }
-
-  let received;
-
-  try {
-    if(this.role==='admin' && this.token){
-      try {
-        received=await http('operator_list',{},this.token);
-      } catch(e) {
-        if(!String(e.message||e).includes('SESION_NO_AUTORIZADA')){
-          throw e;
-        }
-      }
-    }
-
-    if(!received){
-      const sesion=currentSession();
-
-      if(sesion?.role!=='admin'){
-        alert('Debes iniciar sesión como ADMINISTRADOR.');
-        return;
-      }
-
-      const pin=prompt('Ingresa nuevamente tu PIN de ADMINISTRADOR:');
-      if(pin===null)return;
-
-      const login=await http('admin_login',{pin});
-
-      this.token=login.token;
-      this.role='admin';
-
-      sessionStorage.setItem(admKey,login.token);
-      sessionStorage.setItem(
-        AMS_SESSION_KEY,
-        JSON.stringify({...sesion,cloud:true})
-      );
-
-      received=await http('operator_list',{},this.token);
-      this.draw();
-    }
-
-  } catch(e) {
-    alert('ERROR DE USUARIOS: '+(e.message||String(e)));
-    return;
-  }
-
-  const list=received.operators||[];
+     if(!this.ready||!this.configured)return alert('Conexión Supabase no preparada.');
+     let received;
+     try{
+       if(this.role==='admin'&&this.token)received=await http('operator_list',{},this.token);
+       else{
+         if(currentSession()?.role!=='admin')return alert('Solo administrador.');
+         const pin=prompt('PIN de administrador para gestionar usuarios:');if(pin===null)return;
+         const result=await http('admin_login',{pin});
+         this.token=result.token;this.role='admin';sessionStorage.setItem(admKey,result.token);
+         const session=currentSession();sessionStorage.setItem(AMS_SESSION_KEY,JSON.stringify({...session,cloud:true}));
+         received=await http('operator_list',{},this.token);this.draw();
+       }
+     }catch(e){return alert('No fue posible consultar usuarios: '+(e.message||e))}
+     const list=received.operators||[];
      if(!list.length)return alert('No se encontraron responsables configurados.');
      const dialog=document.createElement('dialog');dialog.style.cssText='width:min(540px,95vw);max-width:95vw;padding:24px;border:0;border-radius:12px';
      const optionHtml=list.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');

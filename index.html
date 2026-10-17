@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AMS ACOPIO | Gestión y sincronización</title>
-<script src="./config.js?v=7.0.0"></script>
+<script src="./config.js"></script>
 <style>
 :root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#17304d;background:#f3f6fa}*{box-sizing:border-box}body{margin:0}
 header{background:#102a49;color:white;padding:17px 25px;display:flex;justify-content:space-between;align-items:center;gap:12px}header h1{font-size:21px;margin:0}header small{color:#b7d4f3}
@@ -207,6 +207,21 @@ dialog{border:0;border-radius:14px;padding:24px;max-width:440px;width:calc(100% 
 }
 @media(max-width:370px){main#app{padding:9px 8px 103px!important}.mobile-nav-text{font-size:8px}.mobile-nav-icon{font-size:19px}}
 @media print{#mobileNav{display:none!important}main#app{padding:0!important}}
+</style><style>
+/* AMS V8: historial compacto y personas sin expandir */
+.h12-compact-wrap{width:100%;overflow-x:auto}
+.h12-table.h12-compact{width:100%;min-width:830px;table-layout:fixed;font-size:10.5px}
+.h12-compact th{font-size:9px;white-space:normal;padding:7px 4px;line-height:1.15}
+.h12-compact td{font-size:10.5px;padding:6px 4px;line-height:1.2;overflow-wrap:anywhere}
+.h12-compact th:nth-child(1){width:12%}.h12-compact th:nth-child(2){width:11%}
+.h12-compact th:nth-child(3){width:10%}.h12-compact th:nth-child(4){width:20%}
+.h12-compact th:nth-child(5){width:13%}.h12-compact th:nth-child(6){width:7%}
+.h12-compact th:nth-child(7){width:14%}.h12-compact th:nth-child(8){width:8%}
+.h12-compact th:nth-child(9){width:8%}
+.h12-badge{display:block;font-size:9px;color:#145c8c}
+.h12-info{font-size:12px;padding:3px 0 9px;color:#385c79}
+.stay-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.stay-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.stay-cards .card{padding:8px;font-size:10px}.stay-cards .card b{font-size:18px}}
 </style></head><body>
 <header><div><h1>AMS ACOPIO</h1><small>Analytica Mineral Services SAC · Gestión de operaciones</small></div><span class="tag">MODO LOCAL · CONFIGURA SUPABASE</span></header>
 <div class="layout"><aside id="sidebar"></aside><main id="app"></main></div><nav id="mobileNav" aria-label="Navegación de Atención al Cliente"></nav>
@@ -245,11 +260,11 @@ function pickMotive(i){captureDraft();saveExtrasDraft();motiveSelected=motives[i
 function changeMotive(){const el=document.getElementById('motiveSelect');captureDraft();saveExtrasDraft();motiveSelected=el.value;vehiclePending=false;extraPeople=[];render()}
 function toggleVehiclePending(){captureDraft();saveExtrasDraft();vehiclePending=!vehiclePending;render()}
 function toggleProviderPending(i){captureDraft();saveExtrasDraft();extraPeople[i].pending=!extraPeople[i].pending;render()}
-function captureDraft(){for(const id of ['guard','shift','plate','zone','driverdni','drivername','driverphone','license','licensecat','lots','load','lotcode','mainDni','mainName','mainPhone','mainLots','mainSacks','mainLotCode']){const el=document.getElementById(id);if(el)entryDraft[id]=el.value}}
+function captureDraft(){for(const id of ['guard','shift','plate','zone','driverdni','drivername','driverphone','license','licensecat','lots','load','lotcode','mainDni','mainName','mainPhone','mainLots','mainSacks','mainLotCode']){const el=document.getElementById(id);if(el)entryDraft[id]=/^(drivername|mainName)$/.test(id)?el.value.toLocaleUpperCase('es-PE'):el.value}}
 function restoreDraft(){for(const [id,v] of Object.entries(entryDraft)){const el=document.getElementById(id);if(el)el.value=v}}
 function txt(label,id,placeholder='',type='text',disabled=false){
-const dni=/^(driverdni|mainDni|extraDni\d+)$/.test(id),phone=/^(driverphone|mainPhone|extraPhone\d+)$/.test(id),num=dni||phone,limit=dni?8:phone?9:0;
-return `<div class="field"><label>${label}</label><input id="${id}" type="${num?'text':type}" inputmode="${num?'numeric':'text'}" ${num?`maxlength="${limit}" pattern="[0-9]{${limit}}"`:''} autocomplete="off" placeholder="${placeholder}" ${disabled?'disabled':''} value="${esc(entryDraft[id]||'')}" ${num?`oninput="numericChanged(this,${limit})"`:''} ${dni?`onblur="autofillDni('${id}')"`:''}></div>`}
+const dni=/^(driverdni|mainDni|extraDni\d+)$/.test(id),phone=/^(driverphone|mainPhone|extraPhone\d+)$/.test(id),lots=/^(lots|mainLots|extraLots\d+)$/.test(id),isName=/^(drivername|mainName|extraName\d+)$/.test(id),num=dni||phone||lots,limit=dni?8:phone?9:lots?5:0;
+return `<div class="field"><label>${label}</label><input id="${id}" type="${num?'text':type}" inputmode="${num?'numeric':'text'}" ${num?`pattern="[0-9]{${lots?'0,'+limit:limit}}"`:''} autocomplete="off" placeholder="${placeholder}" ${disabled?'disabled':''} value="${esc(entryDraft[id]||'')}" ${num?`oninput="numericChanged(this,${limit})"`:isName?'oninput="this.value=this.value.toLocaleUpperCase(\'es-PE\')"':''} ${dni?`onblur="autofillDni('${id}')"`:''}></div>`}
 function numericChanged(el,limit){const old=el.value;el.value=old.replace(/\D/g,'').slice(0,limit);if(el.value!==old)el.setCustomValidity('');if(/^((driverdni)|(mainDni)|(extraDni\d+))$/.test(el.id)&&el.value.length===8)autofillDni(el.id)}
 function clientCatalog(){
 const catalog=new Map();
@@ -260,18 +275,37 @@ for(const p of [...state.people].reverse()){
 }
 return catalog;
 }
-function autofillDni(id){const input=document.getElementById(id);if(!input||!/^[0-9]{8}$/.test(input.value))return;
-const found=clientCatalog().get(input.value);if(!found)return;
-const prefix=id==='driverdni'?'driver':id==='mainDni'?'main':id.match(/^extraDni(\d+)$/)?.[1];
-const suffix=id.startsWith('extraDni')?prefix:'';
-const nameId=id.startsWith('extraDni')?'extraName'+suffix:prefix+'name';
-const phoneId=id.startsWith('extraDni')?'extraPhone'+suffix:prefix+'phone';
-const realNameId=id==='mainDni'?'mainName':nameId;
-const realPhoneId=id==='mainDni'?'mainPhone':phoneId;
-for(const [target,value] of [[realNameId,found.name],[realPhoneId,found.phone],...(id==='driverdni'?[['license',found.license],['licensecat',found.licensecat]]:[])]){
- const el=document.getElementById(target);if(el&&value){el.value=value;if(!target.startsWith('extra'))entryDraft[target]=value;else{const i=Number(suffix);if(extraPeople[i])extraPeople[i][target.includes('Name')?'name':'phone']=value}}
+async function autofillDni(id){
+ const input=document.getElementById(id), dni=input?.value||'';
+ if(!/^\d{8}$/.test(dni))return;
+ let found=null;
+ try{found=await window.AMSCloud?.lookupCatalog?.('dni',dni)}catch(e){console.warn('Consulta de DNI sin respuesta:',e.message)}
+ if(!found)found=clientCatalog().get(dni);
+ // Si el operario siguió escribiendo, descartar una respuesta desactualizada.
+ if(!found||input.value!==dni)return;
+ const extra=id.match(/^extraDni(\d+)$/);
+ const suffix=extra?extra[1]:'';
+ const mappings=extra
+  ?[['extraName'+suffix,found.name||found.nombres_apellidos],['extraPhone'+suffix,found.phone||found.celular]]
+  :id==='driverdni'
+   ?[['drivername',found.name||found.nombres_apellidos],['driverphone',found.phone||found.celular],['license',found.license||found.licencia_conducir],['licensecat',found.licensecat||found.categoria]]
+   :[['mainName',found.name||found.nombres_apellidos],['mainPhone',found.phone||found.celular]];
+ for(const [target,value] of mappings){
+  const el=document.getElementById(target);if(!el||!value)continue;
+  const normalized=/name/i.test(target)?String(value).toLocaleUpperCase('es-PE'):String(value);
+  el.value=normalized;
+  if(!target.startsWith('extra'))entryDraft[target]=normalized;
+  else{const i=Number(suffix);if(extraPeople[i])extraPeople[i][/Name/.test(target)?'name':'phone']=normalized;}
+ }
+ const note=document.getElementById('clientLookupStatus');if(note)note.textContent='✓ DNI encontrado. Datos autocompletados, verifica antes de guardar.';
 }
-const note=document.getElementById('clientLookupStatus');if(note)note.textContent='✓ DNI encontrado en registros anteriores. Datos autocompletados (puedes corregirlos).';
+function lookupRucIfPresent(id,rucNameId){
+ const el=document.getElementById(id),ruc=el?.value||'';
+ if(!/^\d{11}$/.test(ruc))return;
+ window.AMSCloud?.lookupCatalog?.('ruc',ruc).then(x=>{
+  if(!x||el?.value!==ruc)return;
+  const field=document.getElementById(rucNameId);if(field)field.value=x.razon_social||'';
+ }).catch(e=>console.warn('Consulta RUC:',e.message));
 }
 
 function drop(label,id,opts,disabled=false){return `<div class="field"><label>${label}</label><select id="${id}" ${disabled?'disabled':''}>${opts.map(x=>`<option ${entryDraft[id]===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>`}
@@ -279,7 +313,7 @@ function personalForm(idx){
  const p=extraPeople[idx],t=p.type,comp=t==='Acompañante',pending=!!p.pending;
  return `<div class="panel" style="border-left:4px solid ${comp?'#748ba5':'#2396cb'}"><div class="row" style="justify-content:space-between;align-items:center"><h3>PERSONA ${idx+1} · ${esc(t)}</h3><div class="row">${!comp?`<button class="btn secondary smallbtn" onclick="toggleProviderPending(${idx})">${pending?'✓ POR REGULARIZAR':'◻ POR REGULARIZAR'}</button>`:''}${btn('Quitar',`removeExtra(${idx})`,'danger smallbtn')}</div></div><div class="row">${drop('Tipo de persona',`extraType${idx}`,['Proveedor','Acompañante'])}${txt('DNI'+(pending?' (opcional)':' *'),`extraDni${idx}`,'8 dígitos')}${txt('Nombres y apellidos'+(pending?' (opcional)':' *'),`extraName${idx}`)}${txt('Celular'+(comp||pending?' (opcional)':' *'),`extraPhone${idx}`,'9 dígitos')}</div>${comp?'':`<div class="row" style="margin-top:12px">${txt('N.º de lotes'+(pending?' (opcional)':' *'),`extraLots${idx}`,'0','number')}${!['Ingreso de carga','Verificar su proceso presencial','Remuestreo (RM)','Recoger muestra'].includes(motiveSelected)?txt('N.º de sacos (opcional)',`extraSacks${idx}`,'0','number'):''}${txt(motiveSelected==='Retiro de lote'?'Código de lote':'Detalle de carga',`extraLoad${idx}`)}</div>`}<p class="hint">${pending?'Datos opcionales: se guardará pendiente de regularización en el historial.':comp?'El acompañante no tiene campos de detalle de carga.':'Los lotes del proveedor se registran sin duplicarlos con los del conductor.'}</p></div>`
 }
-function saveExtrasDraft(){extraPeople.forEach((p,i)=>{for(const [k,suffix] of [['type','Type'],['dni','Dni'],['name','Name'],['phone','Phone'],['lots','Lots'],['sacks','Sacks'],['load','Load']]){const el=document.getElementById('extra'+suffix+i);if(el)p[k]=el.value}})}
+function saveExtrasDraft(){extraPeople.forEach((p,i)=>{for(const [k,suffix] of [['type','Type'],['dni','Dni'],['name','Name'],['phone','Phone'],['lots','Lots'],['sacks','Sacks'],['load','Load']]){const el=document.getElementById('extra'+suffix+i);if(el)p[k]=k==='name'?el.value.toLocaleUpperCase('es-PE'):el.value}})}
 function addExtra(){captureDraft();saveExtrasDraft();extraPeople.push({type:'Proveedor',pending:false});render()}
 function removeExtra(i){captureDraft();saveExtrasDraft();extraPeople.splice(i,1);render()}
 function updateExtraType(i){captureDraft();saveExtrasDraft();extraPeople[i].type=val('extraType'+i);render()}
@@ -301,6 +335,19 @@ out+=`<section class="panel"><div class="blocktitle purple">E. AGREGAR PROVEEDOR
 out+=`<div class="row" style="justify-content:flex-end;margin:20px 0">${btn('Cancelar','cancelEntry()','secondary')}${btn('Vista previa','previewEntry()','secondary')}${btn(regularizeTarget?'Guardar regularización':'Guardar ingreso','saveEntry()')}</div>`;
 setTimeout(()=>{const sel=document.getElementById('motiveSelect');if(sel){sel.value=motiveSelected||'';sel.onchange=changeMotive}for(const [i,p] of extraPeople.entries()){for(const [k,suffix] of [['type','Type'],['dni','Dni'],['name','Name'],['phone','Phone'],['lots','Lots'],['sacks','Sacks'],['load','Load']]){const el=document.getElementById('extra'+suffix+i);if(el){el.value=p[k]||'';if(k==='type')el.onchange=()=>updateExtraType(i)}}}},0);
 return out;
+}
+
+async function consultarCatalogoAMS(){
+ const tipo=val('amsCatTipo')==='RUC'?'ruc':'dni';
+ const n=val('amsCatNumero').replace(/\D/g,'');
+ const label=document.getElementById('amsCatResultado');
+ if(!new RegExp('^\\d{'+(tipo==='dni'?'8':'11')+'}$').test(n)){label.textContent='Número de documento inválido.';return}
+ label.textContent='Consultando Supabase...';
+ try{
+  const x=await window.AMSCloud?.lookupCatalog?.(tipo,n);
+  if(!x){label.textContent='Sin coincidencias o conexión de consulta pendiente de instalar.';return}
+  label.textContent=tipo==='dni'?`${x.dni} · ${x.nombres_apellidos} · Celular: ${x.celular||'—'} · Licencia: ${x.licencia_conducir||'—'}`:`${x.ruc} · ${x.razon_social}`;
+ }catch(e){label.textContent='Consulta no disponible: '+(e.message||e)}
 }
 function cancelEntry(){if(regularizeTarget){ask('¿Salir de la regularización sin guardar cambios?',()=>{cancelRegularization()});return;}ask('¿Descartar el formulario actual?',()=>{motiveSelected='';vehiclePending=false;extraPeople=[];entryDraft={};resetEntryClock();addLog('Formulario de ingreso cancelado')})}
 function previewEntry(){captureDraft();saveExtrasDraft();alert('VISTA PREVIA\\nMotivo: '+motiveSelected+'\\nSituación: '+(cargoCase||'No aplica')+'\\nPersonas adicionales: '+extraPeople.length+'\\nGuardia: '+val('guard')+' · Turno: '+val('shift'))}
@@ -357,33 +404,29 @@ function getHistoryGroups(){
 }
 function historyPage(){
  const today=amsToday();
- // El historial operativo muestra únicamente personas que permanecen en planta hoy.
- const groups=getHistoryGroups().map(g=>({...g,people:g.people.filter(p=>amsPresentOn(p,today)&&!p.exit)})).filter(g=>g.people.length).map(g=>({...g,first:g.people[0],incomplete:g.people.some(p=>p.type==='Proveedor por regularizar'||p.type==='Vehículo por regularizar'||p.pending===true)}));
+ const groups=getHistoryGroups().map(g=>({...g,people:g.people.filter(p=>amsPresentOn(p,today)&&!p.exit)})).filter(g=>g.people.length);
  const f=historyFilters;
  const filtered=groups.filter(g=>{
-  const search=g.people.map(p=>[p.name,p.dni,p.plate,p.motive,p.phone].join(' ')).join(' ').toLowerCase();
-  const date=amsISO(g.first.entry);
-  const status=g.incomplete?'Por regularizar':'Completo';
-  return (!f.q||search.includes(f.q.toLowerCase()))&&(!f.from||date>=f.from)&&(!f.to||date<=f.to)&&(f.motive==='Todos'||g.first.motive===f.motive)&&(f.status==='Todos'||status===f.status);
+  const text=g.people.map(p=>[p.name,p.dni,p.plate,p.motive,p.phone].join(' ')).join(' ').toLowerCase();
+  const day=amsISO(g.first.entry);
+  const pending=g.people.some(p=>p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type));
+  return (!f.q||text.includes(f.q.toLowerCase()))&&(!f.from||day>=f.from)&&(!f.to||day<=f.to)&&
+   (f.motive==='Todos'||g.first.motive===f.motive)&&
+   (f.status==='Todos'||(pending?'Por regularizar':'Completo')===f.status);
  });
- const bad=filtered.filter(g=>g.incomplete).length;
- let out=head('1.2 HISTORIAL','Personas registradas que permanecen en planta hoy. Al registrar su salida en 1.3 dejan de aparecer en esta relación.');
- out+=`<section class="panel" style="padding:12px 16px;margin-bottom:10px"><div class="h12-filter">
- ${field('🔍 Buscar','hsearch','DNI, nombre o placa...')}${field('Fecha desde','hfrom','','date')}${field('Fecha hasta','hto','','date')}${select('Motivo de ingreso','hmotive',['Todos',...motives])}${select('Estado','hstatus',['Todos','Completo','Por regularizar'])}
- ${btn('⌕ Buscar','applyHistoryFilters()')}${btn('↻ Limpiar','clearHistoryFilters()','secondary')}
- </div></section>`;
- out+=`<div class="h12-summary"><div class="h12-kpi"><div class="ico">👥</div><div><label>TOTAL DE INGRESOS</label><b>${filtered.length}</b></div></div><div class="h12-kpi green"><div class="ico">✔</div><div><label>COMPLETOS</label><b>${filtered.length-bad}</b></div></div><div class="h12-kpi orange"><div class="ico">!</div><div><label>POR REGULARIZAR</label><b>${bad}</b></div></div></div>`;
- out+=`<section class="panel scroll" style="padding:0"><table class="h12-table h12-group-table"><thead><tr>${['FECHA Y HORA','PLACA','MOTIVO DE INGRESO','TIPO DE PERSONA','LICENCIA','NOMBRES Y APELLIDOS','ZONA','N.º LOTES','DETALLE / CÓDIGO','ESTADO','ACCIONES'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
- if(!filtered.length)out+='<tr><td colspan="11" class="h12-empty">No hay personas presentes que coincidan con los filtros.</td></tr>';
- filtered.forEach(g=>{
-  const open=expandedHistory.has(g.id),p=g.first,pend=g.incomplete;
-  const lots=g.people.reduce((n,x)=>n+(Number(x.lots)||0),0);
-  const license=g.people.find(x=>x.license)?.license||'—';
-  const detail=g.people.map(x=>x.lotCode||x.load||'').filter(Boolean).join(' / ')||'—';
-  const actions=`<button class="edit" title="${pend?'Completar datos pendientes':'Ver datos'}" onclick="${pend?`startRegularize('${g.id}')`:`detailPerson(${p.id})`}">${pend?'✎ Regularizar':'⌕ Ver'}</button>${g.people.length>1?` <button title="Mostrar u ocultar personas" onclick="toggleHistoryGroup('${g.id}')">${open?'⌃ Ocultar':'⌄ Personas'}</button>`:''}`;
-  out+=`<tr class="h12-group-head ${pend?'h12-group-incomplete':'h12-group-complete'}"><td>${esc(p.entry)}</td><td>${esc(p.plate||'—')}</td><td>${esc(p.motive||'—')}</td><td>${esc(g.people.length>1?g.people.length+' personas':p.type)}</td><td>${esc(license)}</td><td>${esc(g.people.length>1?p.name+' y otros':p.name)}</td><td>${esc(p.zone||'—')}</td><td>${lots}</td><td>${esc(detail)}</td><td><span class="h12-status ${pend?'bad':''}">${pend?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions">${actions}</td></tr>`;
-  if(open&&g.people.length>1)for(const x of g.people){const xp=x.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(x.type);out+=`<tr class="h12-person-row"><td>${esc(x.entry)}</td><td>${esc(x.plate||'—')}</td><td>${esc(x.motive||p.motive||'—')}</td><td>${esc(x.type)}</td><td>${esc(x.license||license)}</td><td>${esc(x.name)}</td><td>${esc(x.zone||p.zone||'—')}</td><td>${esc(x.lots||0)}</td><td>${esc(x.lotCode||x.load||'—')}</td><td>${xp?'POR REGULARIZAR':'COMPLETO'}</td><td class="h12-actions"><button onclick="${xp?`startRegularize('${g.id}')`:`detailPerson(${x.id})`}">${xp?'✎ Regularizar':'⌕ Ver'}</button></td></tr>`}
- });
+ let out=head('1.2 HISTORIAL','Todas las personas presentes se muestran directamente. Se identifican por placa y cantidad en el mismo vehículo.');
+ out+=`<section class="panel" style="padding:10px;margin:10px 0"><div class="h12-filter">
+ ${field('Buscar','hsearch','DNI, nombre o placa...')}${field('Fecha desde','hfrom','','date')}${field('Fecha hasta','hto','','date')}${select('Motivo de ingreso','hmotive',['Todos',...motives])}${select('Estado','hstatus',['Todos','Completo','Por regularizar'])}
+ ${btn('Buscar','applyHistoryFilters()')}${btn('Limpiar','clearHistoryFilters()','secondary')}</div></section>`;
+ out+=`<div class="h12-info">Vehículos / ingresos: <b>${filtered.length}</b> · Personas visibles: <b>${filtered.reduce((n,g)=>n+g.people.length,0)}</b></div>`;
+ out+=`<section class="panel scroll h12-compact-wrap" style="padding:0"><table class="h12-table h12-compact"><thead><tr>${['FECHA Y HORA','PLACA / PERSONAS','TIPO','NOMBRES Y APELLIDOS','MOTIVO','ZONA','LOTES / DETALLE','ESTADO','ACCIÓN'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
+ if(!filtered.length)out+='<tr><td colspan="9" class="h12-empty">No hay personas presentes que coincidan con los filtros.</td></tr>';
+ filtered.forEach(g=>g.people.forEach((p,i)=>{
+  const pending=p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type);
+  const action=pending?`startRegularize('${g.id}')`:`detailPerson(${p.id})`;
+  const detail=[p.lots?'Lotes: '+p.lots:'',p.lotCode||p.load||''].filter(Boolean).join(' · ')||'—';
+  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending?'bad':''}">${pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions"><button onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button></td></tr>`;
+ }));
  out+='</tbody></table></section>';
  setTimeout(()=>{for(const [id,v] of Object.entries({hsearch:historyFilters.q,hfrom:historyFilters.from,hto:historyFilters.to,hmotive:historyFilters.motive,hstatus:historyFilters.status})){const el=document.getElementById(id);if(el)el.value=v}},0);
  return out;
@@ -420,7 +463,7 @@ if(active==='4.1')return head('4.1 PANEL ADMINISTRATIVO','Resumen de la demostra
 if(active==='4.2')return head('4.2 USUARIOS','Cuentas individuales registradas en Supabase.')+panel('ADMINISTRACIÓN DE USUARIOS',`<p>Crea usuarios nuevos, configura contraseñas, bloquea y habilita cuentas. Los cambios se guardan en Supabase.</p>${btn('⚙ Gestionar usuarios y contraseñas','window.AMSCloud.manageOperators()')}`);
 if(active==='4.3')return head('4.3 ROLES Y PERMISOS','Vista de los roles previstos.')+panel('Permisos por módulo',table(['Rol','Atención','Guías','Operaciones','Administrador'],[['Responsables autorizados','✓','—','✓','—'],['Administrador','✓','✓','✓','✓']]));
 if(active==='4.4')return adminRecordsAMS();
-if(active==='4.5')return head('4.5 CATÁLOGOS','Catálogos definidos en el diseño.')+panel('Listas de referencia',`<div class="pills">${['Motivos de ingreso','Tipos de persona','Servicios','Estados de habitación','Tipos de cargo','Estados RI/RM'].map(x=>`<span class="pill">${x}</span>`).join('')}</div>`);
+if(active==='4.5')return head('4.5 CATÁLOGOS','Consulta autorizada en Supabase, sin descargar las bases completas.')+panel('BÚSQUEDA POR DNI / RUC',`<div class="row">${select('Tipo de documento','amsCatTipo',['DNI','RUC'])}${field('Número','amsCatNumero','8 u 11 dígitos')}${btn('Consultar','consultarCatalogoAMS()')}</div><p class="hint">DNI: 8 dígitos. RUC: 11 dígitos. Consulta solo usuarios autenticados.</p><div id="amsCatResultado" class="h12-detail" role="status">Escribe un documento y presiona Consultar.</div>`);
 if(active==='4.6')return head('4.6 AUDITORÍA','Historial de acciones realizadas en este prototipo.')+panel('Eventos',table(['Fecha y hora','Acción'],state.logs.map(x=>[x.date,esc(x.action)])));
 return head(title,'Sección en preparación')}
 
@@ -477,7 +520,7 @@ function amsDayLabel(p,day){if(amsISO(p.exit)===day)return 'SALIDA';return amsIS
 function amsStayRows(people){const day=amsToday();return [...people].sort((a,b)=>Number(amsISO(a.entry)===day)-Number(amsISO(b.entry)===day)||String(a.entry||'').localeCompare(String(b.entry||''))).map(p=>[`<input type="checkbox" class="personcheck" value="${p.id}">`,esc(p.plate||'—'),esc(p.zone||'—'),esc(p.name),esc(p.phone||'—'),esc(p.motive||'—'),esc(p.entry),esc(p.exit||'—'),esc(p.room&&isRoom(+p.room)?p.room:'—'),...amsDailyServices(p,day).map(String),'<span style="color:green">'+(amsISO(p.entry)===day?'INGRESO':'PERMANENCIA')+'</span>',esc(p.attendant||p.responsible||'—'),`${btn('Hab. / Editar',`assignRoom(${p.id})`,'secondary smallbtn')} ${btn('Salir',`leavePlant(${p.id})`,'danger smallbtn')}`])}
 function stayPage(){const live=state.people.filter(p=>!p.exit),today=new Date().toLocaleDateString('es-PE'),todayServices=state.services.filter(x=>x.date.includes(today));const sums=Array.from({length:6},(_,i)=>todayServices.filter(x=>x.service===i).length);const all=state.people;
 const rows=amsStayRows(live);
-return head('1.3 ESTADÍA Y SERVICIOS AL PROVEEDOR','Control de personas en planta, alimentación y refrigerios.')+`<div class="stay-cards">${[['👥 PERSONAS EN PLANTA',live.length],['➡️ INGRESARON HOY',all.filter(p=>p.entry?.includes(today)).length],['🚪 SALIERON HOY',all.filter(p=>p.exit?.includes(today)).length],['🍽️ ALIMENTACIÓN HOY',sums.slice(0,3).reduce((a,b)=>a+b,0)],['🥤 REFRIGERIOS HOY',sums.slice(3).reduce((a,b)=>a+b,0)],['🛏️ HABITACIONES',new Set(activeGuests().map(p=>p.room)).size]].map(([a,b])=>`<div class="card">${a}<b>${b}</b></div>`).join('')}</div>`+panel('BÚSQUEDA Y FILTROS',`<div class="row">${field('Nombre, placa o zona','stayQ')}${select('Motivo','stayMotive',['Todos',...motives,'Operario de Acopio'])}${btn('Buscar','filterStay()')}${btn('Limpiar','setPage("1.3")','secondary')}</div>`)+panel('REGISTRO MASIVO DE CONSUMOS',`<p class="hint">Selecciona personas en la tabla y los servicios a entregar (+1 por servicio y persona).</p><div class="pills">${['Desayuno','Almuerzo','Cena','Agua','Gaseosa','Galleta'].map((x,i)=>`<label class="pill"><input class="servicecheck" type="checkbox" value="${i}" style="width:auto"> ${x}</label>`).join('')}</div>${btn('Registrar seleccionados','giveServices()')}`)+panel('PERSONAS EN PLANTA',`<div id="stayTable">${table(['✓','Placa','Zona','Nombres y apellidos','Celular','Motivo de ingreso','F. ingreso','F. salida','Hab.','Des.','Alm.','Cena','Agua','Gaseosa','Galleta','Estado','Responsable','Acciones'],rows)}</div>`)+panel('REGISTRAR OPERARIOS DE ACOPIO',`<div class="row">${field('DNI *','opdni','8 dígitos')}${field('Nombres y apellidos *','opname')}${select('Autorización *','opauth',['Seleccione','Oscar Cerrón','Kenyi Carvo'])}${select('Motivo de consumo *','opreason',['Seleccione','Proveedor se retiró antes','Separó comida y no llegó','Trabajos operativos'])}</div><br>${btn('Registrar operario','addOperator()')}`)}
+return head('1.3 ESTADÍA Y SERVICIOS AL PROVEEDOR','Control de personas en planta, alimentación y refrigerios.')+`<div class="stay-cards">${[['👥 PERSONAS EN PLANTA',live.length],['🍽️ ALIMENTOS',sums.slice(0,3).reduce((a,b)=>a+b,0)],['🛏️ HABITACIONES',new Set(activeGuests().map(p=>p.room)).size]].map(([a,b])=>`<div class="card">${a}<b>${b}</b></div>`).join('')}</div>`+panel('BÚSQUEDA Y FILTROS',`<div class="row">${field('Nombre, placa o zona','stayQ')}${select('Motivo','stayMotive',['Todos',...motives,'Operario de Acopio'])}${btn('Buscar','filterStay()')}${btn('Limpiar','setPage("1.3")','secondary')}</div>`)+panel('REGISTRO MASIVO DE CONSUMOS',`<p class="hint">Selecciona personas en la tabla y los servicios a entregar (+1 por servicio y persona).</p><div class="pills">${['Desayuno','Almuerzo','Cena','Agua','Gaseosa','Galleta'].map((x,i)=>`<label class="pill"><input class="servicecheck" type="checkbox" value="${i}" style="width:auto"> ${x}</label>`).join('')}</div>${btn('Registrar seleccionados','giveServices()')}`)+panel('PERSONAS EN PLANTA',`<div id="stayTable">${table(['✓','Placa','Zona','Nombres y apellidos','Celular','Motivo de ingreso','F. ingreso','F. salida','Hab.','Des.','Alm.','Cena','Agua','Gaseosa','Galleta','Estado','Responsable','Acciones'],rows)}</div>`)+panel('REGISTRAR OPERARIOS DE ACOPIO',`<div class="row">${field('DNI *','opdni','8 dígitos')}${field('Nombres y apellidos *','opname')}${select('Autorización *','opauth',['Seleccione','Oscar Cerrón','Kenyi Carvo'])}${select('Motivo de consumo *','opreason',['Seleccione','Proveedor se retiró antes','Separó comida y no llegó','Trabajos operativos'])}</div><br>${btn('Registrar operario','addOperator()')}`)}
 function filterStay(){const q=val('stayQ').toLowerCase(),m=val('stayMotive');const rows=amsStayRows(state.people.filter(p=>!p.exit&&(m==='Todos'||p.motive===m)&&[p.name,p.plate,p.zone].some(x=>String(x||'').toLowerCase().includes(q))));document.getElementById('stayTable').innerHTML=table(['✓','Placa','Zona','Nombre','Celular','Motivo','Ingreso','Salida','Hab.','Des.','Alm.','Cena','Agua','Gaseosa','Galleta','Estado','Responsable','Acción'],rows)}
 let cargoType='';let cargoLines=[{type:'',code:'',description:'',reason:'',quantity:'',unit:'',notes:''}];let editingCargoNumber='';let cargoLastSaved='';let cargoMaterialType='';let cargoProviderDraft={dni:'',name:''};
 const cargoDrivers=['Seleccionar','JHOMAR GARCIA OSPINO','WILDER CONCE YAURI','WILMER ALVARADO ALIAGA','DONALD ZAMBRANO BASURTO'];
@@ -661,8 +704,8 @@ function filterCargo(){const t=val('cargoFilterType'),q=val('cargoFilterCode').t
 let reportTab=0;const reportTabs=['Resumen general','Proveedores y permanencia','Alimentación y consumos','Habitaciones y alojamiento','Limpieza e inventario','Cargos y salidas'];
 function reportPage(){return head('1.6 REPORTE DE ALIMENTOS','Registro detallado de alimentación, refrigerios y artículos de aseo.')+panel('FILTROS DE REPORTE',`<div class="row">${field('Fecha desde','reportFrom','','date').replace('id="reportFrom"','id="reportFrom" value="'+esc(reportFilterCache.from||'')+'"')}${field('Fecha hasta','reportTo','','date').replace('id="reportTo"','id="reportTo" value="'+esc(reportFilterCache.to||'')+'"')}${select('Guardia','reportGuard',['Todas','A','B','C'])}${select('Turno','reportShift',['Todos','Día','Noche'])}${btn('Aplicar filtros','applyReportFilters()')}${btn('Imprimir / PDF','printFoodReport()','secondary')}</div>`)+panel('RESUMEN GENERAL',reportGeneralTable())+`<p class="hint">Los registros de este archivo son locales. Para reportes con datos reales se requiere integrar Google Sheets.</p>`}
 function reportRange(){const from=reportFilterCache.from||amsToday(),to=reportFilterCache.to||reportFilterCache.from||amsToday();return {from,to,guard:reportFilterCache.guard||'Todas',shift:reportFilterCache.shift||'Todos'}}
-function reportGeneralRows(){const f=reportRange();if(f.from>f.to)return [];const result=[];for(let day=f.from;day<=f.to;day=amsNextDay(day)){for(const p of state.people){const inPlant=amsPresentOn(p,day),lodged=amsLodgedOn(p,day);if(!inPlant&&!lodged)continue;const session=p.session||{};const guard=p.guard||p.guardia||session.guard||'',shift=p.shift||p.turno||session.shift||'';if(f.guard!=='Todas'&&guard!==f.guard||f.shift!=='Todos'&&shift!==f.shift)continue;const op=p.type==='Operario'||p.motive==='Operario de Acopio',visitor=p.type==='Visitante autorizado';const daily=amsDailyServices(p,day),kit=amsKitOn(p,day);result.push([day,p.name||'',op?'Consumo':visitor?'Alojamiento autorizado':p.motive||'',op?'Operario':visitor?'Visitante':p.type||'',...daily,lodged?p.room||'—':'—',...kit,p.responsible||p.createdBy||p.registeredBy||session.name||'',guard,shift,amsDayLabel(p,day),amsDays(amsISO(p.entry||p.lodgingEntry),day)])}}return result.sort((a,b)=>a[0].localeCompare(b[0])||Number(b[16]==='PERMANENCIA')-Number(a[16]==='PERMANENCIA'))}
-const generalHeaders=['N.º','Fecha de ingreso','Nombres y apellidos','Motivo de ingreso','Tipo de persona','Desayuno','Almuerzo','Cena','Agua','Gaseosa','Galleta','N.º habitación','Shampoo','Jabón','Papel higiénico','Responsable','Guardia','Turno','Condición','Días de permanencia'];
+function reportGeneralRows(){const f=reportRange();if(f.from>f.to)return [];const result=[];for(let day=f.from;day<=f.to;day=amsNextDay(day)){for(const p of state.people){const inPlant=amsPresentOn(p,day),lodged=amsLodgedOn(p,day);if(!inPlant&&!lodged)continue;const session=p.session||{};const guard=p.guard||p.guardia||session.guard||'',shift=p.shift||p.turno||session.shift||'';if(f.guard!=='Todas'&&guard!==f.guard||f.shift!=='Todos'&&shift!==f.shift)continue;const op=p.type==='Operario'||p.motive==='Operario de Acopio',visitor=p.type==='Visitante autorizado';const daily=amsDailyServices(p,day),kit=amsKitOn(p,day);result.push([p.entry||day,p.name||'',op?'Consumo':visitor?'Alojamiento autorizado':p.motive||'',op?'Operario':visitor?'Visitante':p.type||'',...daily,lodged?p.room||'—':'—',...kit,p.responsible||p.createdBy||p.registeredBy||session.name||'',guard,shift,amsDayLabel(p,day),amsDays(amsISO(p.entry||p.lodgingEntry),day)])}}return result.sort((a,b)=>a[0].localeCompare(b[0])||Number(b[16]==='PERMANENCIA')-Number(a[16]==='PERMANENCIA'))}
+const generalHeaders=['N.º','Fecha y hora de ingreso','Nombres y apellidos','Motivo de ingreso','Tipo de persona','Desayuno','Almuerzo','Cena','Agua','Gaseosa','Galleta','N.º habitación','Shampoo','Jabón','Papel higiénico','Responsable','Guardia','Turno','Condición','Días de permanencia'];
 function reportGeneralTable(){const rows=reportGeneralRows(),sums=[4,5,6,7,8,9,11,12,13].map(i=>rows.reduce((n,r)=>n+(Number(r[i])||0),0));const data=rows.map((r,i)=>[i+1,...r.map(esc)]);const total=Array(generalHeaders.length).fill('');total[2]='TOTAL';[6,7,8,9,10,11,13,14,15].forEach((col,i)=>total[col]=sums[i]);return '<div class="scroll" style="overflow-x:auto">'+table(generalHeaders,[...data,total])+'</div><p class="hint">'+rows.length+' registros diarios en el periodo seleccionado. PERMANENCIA identifica a quienes siguen en planta desde días anteriores. Los consumos se contabilizan por fecha.</p>'}
 function printFoodReport(){
  const rows=reportGeneralRows();
@@ -672,7 +715,7 @@ function printFoodReport(){
  const totals=`<tr class="total">${total.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`;
  const f=reportRange();const periodo=[f.from,f.to].join(' — ');
  const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>AMS ACOPIO - Reporte de alimentos</title><style>
- @page{size:A3 landscape;margin:9mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#142c47;margin:0}h1,h2,p{margin:2px 0;text-align:center}h1{font-size:16px}h2{font-size:12px}.meta{display:flex;justify-content:space-between;margin:12px 0 8px;font-size:10px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #7f9bb4;padding:4px 2px;overflow-wrap:anywhere;text-align:center}th{background:#dbe9f5;font-size:9px;height:98px;vertical-align:bottom}th.vertical{width:25px;padding:0;position:relative}th.vertical span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:nowrap;padding:5px 0}td{font-size:9px}td:nth-child(3),td:nth-child(4),td:nth-child(5),td:nth-child(16){text-align:left}th:nth-child(1){width:26px}th:nth-child(2){width:88px}th:nth-child(3){width:155px}th:nth-child(4){width:95px}th:nth-child(5){width:74px}th:nth-child(12){width:36px}th:nth-child(16){width:100px}th:nth-child(17){width:40px}th:nth-child(18){width:42px}th:nth-child(19){width:77px}th:nth-child(20){width:48px}tr{break-inside:avoid}.total{font-weight:bold;background:#e6f0fa}.footer{margin-top:15px;text-align:right;font-size:10px}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+ @page{size:A3 landscape;margin:9mm}*{box-sizing:border-box}body{font:10px Arial,sans-serif;color:#142c47;margin:0}h1,h2,p{margin:2px 0;text-align:center}h1{font-size:16px}h2{font-size:12px}.meta{display:flex;justify-content:space-between;margin:12px 0 8px;font-size:10px}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #7f9bb4;padding:4px 2px;overflow-wrap:anywhere;text-align:center}th{background:#dbe9f5;font-size:9px;height:98px;vertical-align:bottom}th.vertical{width:25px;padding:0;position:relative}th.vertical span{writing-mode:vertical-rl;transform:rotate(180deg);display:inline-block;white-space:nowrap;padding:5px 0}td{font-size:9px}td:nth-child(3),td:nth-child(4),td:nth-child(5),td:nth-child(16){text-align:left}td:nth-child(3){font-size:8.5px;line-height:1.12;overflow-wrap:anywhere}th:nth-child(1){width:26px}th:nth-child(2){width:88px}th:nth-child(3){width:170px}th:nth-child(4){width:95px}th:nth-child(5){width:74px}th:nth-child(12){width:36px}th:nth-child(16){width:100px}th:nth-child(17){width:40px}th:nth-child(18){width:42px}th:nth-child(19){width:77px}th:nth-child(20){width:48px}tr{break-inside:avoid}.total{font-weight:bold;background:#e6f0fa}.footer{margin-top:15px;text-align:right;font-size:10px}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
  </style></head><body><h1>ANALYTICA MINERAL SERVICES SAC</h1><h2>ÁREA: ACOPIO</h2><h2>OFICINA DE ATENCIÓN AL CLIENTE</h2><h2>REPORTE DE ALIMENTOS</h2><div class="meta"><span>Periodo: ${esc(periodo)} · Guardia: ${esc(f.guard||'Todas')} · Turno: ${esc(f.shift||'Todos')}</span><span>Fecha de emisión: ${esc(new Date().toLocaleString('es-PE'))}</span></div><table><thead><tr>${headCells}</tr></thead><tbody>${body}${totals}</tbody></table><div class="footer">Total de personas: ${rows.length}</div></body></html>`;
  const w=window.open('','_blank');if(!w){alert('Habilita las ventanas emergentes para imprimir el reporte.');return}w.document.open();w.document.write(html);w.document.close();w.focus();setTimeout(()=>w.print(),350);
 }
@@ -693,9 +736,9 @@ function advance(i){const flow=['Pendiente','Coordinado','Confirmado','En labora
 #amsLogin[hidden]{display:none!important}.ams-login-card{background:#fff;border-radius:16px;box-shadow:0 20px 80px #05162b88;padding:30px;width:min(480px,100%)}
 .ams-login-card h2{margin:0;color:#0c3059}.ams-login-card p{color:#536a83}.ams-login-card .field{margin:12px 0}.ams-login-card input,.ams-login-card select{width:100%;padding:12px;border:1px solid #c8d8e9;border-radius:8px;font-size:15px}.ams-login-card button{width:100%;margin-top:14px;padding:13px}.ams-login-error{color:#b91c1c;font-weight:bold;min-height:20px}.ams-session-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:white}.ams-session-bar button{background:#fff;color:#0b3763;border:0;border-radius:6px;padding:7px 12px;cursor:pointer}
 </style>
-<div id="amsLogin" hidden><form class="ams-login-card" onsubmit="return loginAMS(event)"><h2>AMS ACOPIO</h2><p id="amsLoginCaption">Acceso al sistema</p><div class="field"><label>RESPONSABLE *</label><select id="amsLoginName" required><option value="">Seleccione responsable</option><option value="NOHELLY INGA VENTURA">NOHELLY INGA VENTURA</option><option value="CESAR LUQUE OTOYA">CESAR LUQUE OTOYA</option><option value="SAUL SILVA RIOJA">SAUL SILVA RIOJA</option><option value="SUGELLY CONTRERAS GARCIA">SUGELLY CONTRERAS GARCIA</option><option value="ADMINISTRADOR">ADMINISTRADOR</option></select></div><div class="field" id="amsLoginGuardWrap"><label>GUARDIA *</label><select id="amsLoginGuard"><option value="">Seleccione</option><option>A</option><option>B</option><option>C</option></select></div><div class="field" id="amsLoginShiftWrap"><label>TURNO *</label><select id="amsLoginShift"><option value="">Seleccione</option><option>Día</option><option>Noche</option></select></div><div class="field" id="amsLoginPinWrap" hidden><label>PIN DEL ADMINISTRADOR *</label><input id="amsLoginPin" type="password" inputmode="numeric" minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="4 a 8 dígitos" autocomplete="off"></div><div class="ams-login-error" id="amsLoginError" aria-live="polite"></div><button class="btn" type="submit">Ingresar al sistema</button><p class="hint" id="amsPinHelp"></p></form></div>
+<div id="amsLogin" hidden><form class="ams-login-card" onsubmit="return loginAMS(event)"><h2>AMS ACOPIO</h2><p id="amsLoginCaption">Acceso al sistema</p><div class="field"><label>RESPONSABLE *</label><select id="amsLoginName" required><option value="">Seleccione responsable</option><option value="NOHELLY INGA VENTURA">NOHELLY INGA VENTURA</option><option value="CESAR LUQUE OTOYA">CESAR LUQUE OTOYA</option><option value="SAUL SILVA RIOJA">SAUL SILVA RIOJA</option><option value="SUGELLY CONTRERAS CAJA">SUGELLY CONTRERAS CAJA</option><option value="ADMINISTRADOR">ADMINISTRADOR</option></select></div><div class="field" id="amsLoginGuardWrap"><label>GUARDIA *</label><select id="amsLoginGuard"><option value="">Seleccione</option><option>A</option><option>B</option><option>C</option></select></div><div class="field" id="amsLoginShiftWrap"><label>TURNO *</label><select id="amsLoginShift"><option value="">Seleccione</option><option>Día</option><option>Noche</option></select></div><div class="field" id="amsLoginPinWrap" hidden><label>PIN DEL ADMINISTRADOR *</label><input id="amsLoginPin" type="password" inputmode="numeric" minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="4 a 8 dígitos" autocomplete="off"></div><div class="ams-login-error" id="amsLoginError" aria-live="polite"></div><button class="btn" type="submit">Ingresar al sistema</button><p class="hint" id="amsPinHelp"></p></form></div>
 <script>
-const AMS_OPERATORS=['NOHELLY INGA VENTURA','CESAR LUQUE OTOYA','SAUL SILVA RIOJA','SUGELLY CONTRERAS GARCIA'];
+const AMS_OPERATORS=['NOHELLY INGA VENTURA','CESAR LUQUE OTOYA','SAUL SILVA RIOJA','SUGELLY CONTRERAS CAJA'];
 function adminRecordsAMS(){const keys=['people','guides','requests','cargo','services','users','sacks','logs','cleanings','inventoryMoves'];return head('4.4 REGISTROS','Administración local: consultar, editar y eliminar registros. Los cambios son permanentes en este navegador.')+keys.map(k=>panel(k.toUpperCase()+' ('+(state[k]||[]).length+')',table(['N.º','Detalle','Acciones'],(state[k]||[]).map((x,i)=>[i+1,esc(JSON.stringify(x)).slice(0,190),btn('Editar',`adminEditAMS('${k}',${i})`,'secondary smallbtn')+' '+btn('Eliminar',`adminDeleteAMS('${k}',${i})`,'danger smallbtn')])))).join('')}
 function adminEditAMS(k,i){if(!isAdminAMS())return;const current=state[k]?.[i];if(!current)return;const updated=prompt('Editar registro JSON (conserva los campos necesarios):',JSON.stringify(current,null,2));if(updated===null)return;try{const obj=JSON.parse(updated);if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('Formato inválido');ask('¿Guardar los cambios en el registro?',()=>{state[k][i]=obj;addLog('Administrador editó '+k+' #'+(i+1))})}catch(e){alert('JSON inválido: '+e.message)}}
 function adminDeleteAMS(k,i){if(!isAdminAMS())return;ask('¿Eliminar definitivamente el registro '+(i+1)+' de '+k+'?',()=>{state[k].splice(i,1);addLog('Administrador eliminó '+k+' #'+(i+1))})}
@@ -703,15 +746,17 @@ const AMS_SESSION_KEY='ams-demo-active-session-v1',AMS_ADMIN_PIN_KEY='ams-demo-a
 function currentSession(){try{return JSON.parse(sessionStorage.getItem(AMS_SESSION_KEY)||'null')}catch(e){return null}}
 function updateLoginRoleAMS(){
  const admin=document.getElementById('amsLoginName')?.value==='ADMINISTRADOR';
- for(const id of ['amsLoginGuardWrap','amsLoginShiftWrap']){const el=document.getElementById(id);if(el)el.hidden=admin}
+ for(const id of ['amsLoginGuardWrap','amsLoginShiftWrap']){const el=document.getElementById(id);if(el)el.hidden=true}
  const pinWrap=document.getElementById('amsLoginPinWrap'),pin=document.getElementById('amsLoginPin');
  if(pinWrap)pinWrap.hidden=!admin;
  if(pin){pin.required=admin;if(!admin)pin.value=''}
- document.getElementById('amsLoginGuard').required=!admin;
- document.getElementById('amsLoginShift').required=!admin;
+ document.getElementById('amsLoginGuard').required=false;
+ document.getElementById('amsLoginShift').required=false;
+ const passwd=document.getElementById('amsOperatorPasswordWrap');if(passwd)passwd.hidden=admin;
+ const passInput=document.getElementById('amsOperatorPassword');if(passInput){passInput.required=!admin;if(admin)passInput.value=''}
  const caption=document.getElementById('amsLoginCaption'),help=document.getElementById('amsPinHelp');
- if(caption)caption.textContent=admin?(!localStorage.getItem(AMS_ADMIN_PIN_KEY)?'PRIMER ACCESO DEL ADMINISTRADOR · Configure PIN':'INGRESO DE ADMINISTRADOR · PIN obligatorio'):'INGRESO DE RESPONSABLE · Guardia y turno obligatorios';
- if(help)help.textContent=admin?'El PIN se conserva localmente para este prototipo; no constituye autenticación segura.':'El personal de Atención al Cliente ingresa sin PIN.';
+ if(caption)caption.textContent=admin?'ADMINISTRADOR · INGRESO CON PIN':'INGRESO · USUARIO Y CONTRASEÑA';
+ if(help)help.textContent=admin?'Solo PIN de administrador, verificado por Supabase.':'Cada persona ingresa con su clave personal.';
 }
 document.getElementById('amsLoginName').addEventListener('change',updateLoginRoleAMS);
 function updateSessionHeader(){let h=document.querySelector('header');if(!h)return;let bar=document.getElementById('amsSessionBar');if(!bar){bar=document.createElement('div');bar.id='amsSessionBar';bar.className='ams-session-bar';h.appendChild(bar)}const a=currentSession();bar.innerHTML=a?'<span>👤 '+esc(a.name)+(a.role==='admin'?'':' · Guardia '+esc(a.guard)+' · '+esc(a.shift))+'</span><button type="button" onclick="logoutAMS()">Cerrar sesión</button>':''}
@@ -719,6 +764,7 @@ function showLoginAMS(){const box=document.getElementById('amsLogin');box.hidden
 function loginAMS(e){
  e.preventDefault();
  if(window.AMSCloud?.configured){window.AMSCloud.loginFromForm();return false;}
+ if(window.AMS_CONFIG?.apiUrl){document.getElementById('amsLoginError').textContent='Conexión no disponible. Actualiza la página; no se permite un ingreso local sin autenticar.';return false;}
  const name=document.getElementById('amsLoginName').value.trim(),guard=document.getElementById('amsLoginGuard').value,shift=document.getElementById('amsLoginShift').value,pin=document.getElementById('amsLoginPin').value,error=document.getElementById('amsLoginError');
  const isAdmin=name==='ADMINISTRADOR';
  if(![...AMS_OPERATORS,'ADMINISTRADOR'].includes(name)){error.textContent='Selecciona un responsable válido.';return false}
@@ -738,7 +784,7 @@ async function logoutAMS(){
  sessionStorage.removeItem(AMS_SESSION_KEY);
  updateSessionHeader();showLoginAMS();
 }
-(function initAMSAccess(){if(currentSession()){if(!currentSession().role){sessionStorage.removeItem(AMS_SESSION_KEY);showLoginAMS()}else{document.getElementById('amsLogin').hidden=true;updateSessionHeader();render()}}else{showLoginAMS()}})();
+(function initAMSAccess(){if(window.AMS_CONFIG?.apiUrl&&!currentSession()?.cloud){sessionStorage.removeItem(AMS_SESSION_KEY);showLoginAMS();return;}if(currentSession()){if(!currentSession().role){sessionStorage.removeItem(AMS_SESSION_KEY);showLoginAMS()}else{document.getElementById('amsLogin').hidden=true;updateSessionHeader();render()}}else{showLoginAMS()}})();
 </script>
 <script>
 // Navegación por teclado para todos los formularios, incluidos los diálogos.
@@ -775,5 +821,5 @@ document.addEventListener('keydown', function(event) {
 @media(max-width:900px){#amsCloudBar{width:100%;font-size:9px}#amsCloudBar button{font-size:9px;padding:5px}}
 @media print{#amsCloudBar{display:none!important}}
 </style>
-<script src="./ams-cloud.js?v=7.0.0"></script>
+<script src="./ams-cloud.js?v=7.2.0"></script>
 </body></html>
