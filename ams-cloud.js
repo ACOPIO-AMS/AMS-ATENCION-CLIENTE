@@ -95,13 +95,19 @@ const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(S
      const old=window.updateLoginRoleAMS;
      window.updateLoginRoleAMS=function(){
        old();const admin=val('amsLoginName')==='ADMINISTRADOR';
-       input.hidden=admin||!!localStorage.getItem(devKey);
+    input.hidden=true;
+
+document.getElementById('amsLoginGuardWrap').hidden=true;
+document.getElementById('amsLoginShiftWrap').hidden=true;
+
+document.getElementById('amsLoginGuard').required=false;
+document.getElementById('amsLoginShift').required=false;
        passwordWrap.hidden=admin;
        const pw=document.getElementById('amsOperatorPassword');pw.required=!admin;
        if(admin)pw.value='';
        const help=document.getElementById('amsPinHelp'),caption=document.getElementById('amsLoginCaption');
        if(help)help.textContent=admin?'PIN del administrador verificado por Supabase.':'Cada responsable debe ingresar su contraseña personal en cada nueva sesión. Un dispositivo activado NO reemplaza la contraseña.';
-       if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO DE RESPONSABLE · CONTRASEÑA PERSONAL OBLIGATORIA';
+       if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO AL SISTEMA · USUARIO Y CONTRASEÑA';
      };
      updateLoginRoleAMS();
      this.refreshOperators();
@@ -145,18 +151,11 @@ const configured=/^https:\/\/[\w.-]+\/functions\/v1\/ams-api(?:-v7)?\/?$/.test(S
          const resp=await http('admin_login',{pin});token=resp.token;role='admin';
          sessionStorage.setItem(admKey,token);
        }else{
-         if(!AMS_OPERATORS.includes(name)||!['A','B','C'].includes(guard)||!['Día','Noche'].includes(shift))throw Error('Selecciona responsable, guardia y turno.');
+         if(!AMS_OPERATORS.includes(name))
+  throw Error('Selecciona un usuario válido.');
          const password=document.getElementById('amsOperatorPassword')?.value||'';
          if(password.length<8||password.length>64)throw Error('La contraseña personal debe tener de 8 a 64 caracteres.');
-         let deviceToken=localStorage.getItem(devKey)||'';
-         if(!deviceToken){
-           const code=val('amsEnrollCode');if(!code)throw Error('Activa primero este dispositivo con el código del administrador.');
-           const activated=await http('device_activate',{code,label:navigator.userAgent.slice(0,80)});
-           deviceToken=activated.token;localStorage.setItem(devKey,deviceToken);
-         }
-         // El token del dispositivo SOLO acredita el equipo. Cada usuario
-         // debe entregar SU PROPIA contraseña para obtener una sesión personal.
-         const login=await http('operator_login',{name,password,deviceToken});
+        const login=await http('operator_login',{name,password});
          token=login.token;sessionStorage.setItem(opKey,token);
          document.getElementById('amsOperatorPassword').value='';
          role='operator';
