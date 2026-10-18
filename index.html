@@ -292,7 +292,40 @@ async function autofillDni(id){
    :[['mainName',found.name||found.nombres_apellidos],['mainPhone',found.phone||found.celular]];
  for(const [target,value] of mappings){
   const el=document.getElementById(target);if(!el||!value)continue;
-  const normalized=/name/i.test(target)?String(value).toLocaleUpperCase('es-PE'):String(value);
+  let normalized = /name/i.test(target)
+  ? String(value).toLocaleUpperCase('es-PE')
+  : String(value).trim();
+
+// NORMALIZAR CATEGORÍAS DE LICENCIA
+if (target === 'licensecat') {
+
+  const clave = normalized
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+
+  const categorias = {
+    AI: 'A-I',
+    AIIA: 'A-IIA',
+    AIIB: 'A-IIB',
+    AIIC: 'A-IIC',
+    AIIIA: 'A-IIIA',
+    AIIIB: 'A-IIIB',
+    AIIIC: 'A-IIIC'
+  };
+
+  normalized = categorias[clave] || normalized.toUpperCase();
+
+  // Incorporar categorías que no estén
+  // en la lista desplegable.
+  if (
+    normalized &&
+    !Array.from(el.options).some(
+      opcion => opcion.value === normalized
+    )
+  ) {
+    el.add(new Option(normalized, normalized));
+  }
+}
   el.value=normalized;
   if(!target.startsWith('extra'))entryDraft[target]=normalized;
   else{const i=Number(suffix);if(extraPeople[i])extraPeople[i][/Name/.test(target)?'name':'phone']=normalized;}
