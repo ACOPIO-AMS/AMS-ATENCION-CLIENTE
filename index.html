@@ -437,7 +437,7 @@ function getHistoryGroups(){
 }
 function historyPage(){
  const today=amsToday();
- const groups=getHistoryGroups().map(g=>({...g,people:g.people.filter(p=>amsPresentOn(p,today)&&!p.exit)})).filter(g=>g.people.length);
+ const groups=getHistoryGroups().map(g=>({...g,people:g.people.filter(p=>((amsPresentOn(p,today)&&!p.exit)||(p.status==='ANULADO'&&amsISO(p.entry)===today)))})).filter(g=>g.people.length);
  const f=historyFilters;
  const filtered=groups.filter(g=>{
   const text=g.people.map(p=>[p.name,p.dni,p.plate,p.motive,p.phone].join(' ')).join(' ').toLowerCase();
@@ -445,20 +445,21 @@ function historyPage(){
   const pending=g.people.some(p=>p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type));
   return (!f.q||text.includes(f.q.toLowerCase()))&&(!f.from||day>=f.from)&&(!f.to||day<=f.to)&&
    (f.motive==='Todos'||g.first.motive===f.motive)&&
-   (f.status==='Todos'||(pending?'Por regularizar':'Completo')===f.status);
+   (f.status==='Todos'||(g.people.some(p=>p.status==='ANULADO')?'Anulado':pending?'Por regularizar':'Completo')===f.status);
  });
  let out=head('1.2 HISTORIAL','Todas las personas presentes se muestran directamente. Se identifican por placa y cantidad en el mismo vehículo.');
  out+=`<section class="panel" style="padding:10px;margin:10px 0"><div class="h12-filter">
- ${field('Buscar','hsearch','DNI, nombre o placa...')}${field('Fecha desde','hfrom','','date')}${field('Fecha hasta','hto','','date')}${select('Motivo de ingreso','hmotive',['Todos',...motives])}${select('Estado','hstatus',['Todos','Completo','Por regularizar'])}
+ ${field('Buscar','hsearch','DNI, nombre o placa...')}${field('Fecha desde','hfrom','','date')}${field('Fecha hasta','hto','','date')}${select('Motivo de ingreso','hmotive',['Todos',...motives])}${select('Estado','hstatus',['Todos','Completo','Por regularizar','Anulado'])}
  ${btn('Buscar','applyHistoryFilters()')}${btn('Limpiar','clearHistoryFilters()','secondary')}</div></section>`;
  out+=`<div class="h12-info">Vehículos / ingresos: <b>${filtered.length}</b> · Personas visibles: <b>${filtered.reduce((n,g)=>n+g.people.length,0)}</b></div>`;
  out+=`<section class="panel scroll h12-compact-wrap" style="padding:0"><table class="h12-table h12-compact"><thead><tr>${['FECHA Y HORA','PLACA / PERSONAS','TIPO','NOMBRES Y APELLIDOS','MOTIVO','ZONA','LOTES / DETALLE','ESTADO','ACCIÓN'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
  if(!filtered.length)out+='<tr><td colspan="9" class="h12-empty">No hay personas presentes que coincidan con los filtros.</td></tr>';
  filtered.forEach(g=>g.people.forEach((p,i)=>{
   const pending=p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type);
+  const annulled=p.status==='ANULADO';
   const action=pending?`startRegularize('${g.id}')`:`detailPerson(${p.id})`;
   const detail=[p.lots?'Lotes: '+p.lots:'',p.lotCode||p.load||''].filter(Boolean).join(' · ')||'—';
-  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending?'bad':''}">${pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions"><button onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button></td></tr>`;
+  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending||annulled?'bad':''}">${annulled?'ANULADO':pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions"><button onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button>${amsV82Eligible('people',p)&&!annulled?` <button onclick="amsV82Edit('people','${p.id}')">✏️ Editar</button>${isAdminAMS()?` <button onclick="amsV82Action('people','${p.id}','ANULAR')">🚫 Anular</button> <button onclick="amsV82Action('people','${p.id}','ELIMINAR')">🗑️ Eliminar</button>`:''}`:''}</td></tr>`;
  }));
  out+='</tbody></table></section>';
  setTimeout(()=>{for(const [id,v] of Object.entries({hsearch:historyFilters.q,hfrom:historyFilters.from,hto:historyFilters.to,hmotive:historyFilters.motive,hstatus:historyFilters.status})){const el=document.getElementById(id);if(el)el.value=v}},0);
@@ -545,7 +546,7 @@ function amsISO(value){if(!value)return '';const m=String(value).match(/(\d{1,2}
 function amsToday(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function amsNextDay(iso){const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function amsDays(start,end){const a=new Date(start+'T12:00:00'),b=new Date(end+'T12:00:00');return Math.max(1,Math.round((b-a)/86400000)+1)}
-function amsPresentOn(p,day){const start=amsISO(p.entry||p.lodgingEntry);const end=amsISO(p.exit);return !!start&&start<=day&&(!end||end>=day)}
+function amsPresentOn(p,day){if(p.status==='ANULADO'||p.amsStatus==='ANULADO')return false;const start=amsISO(p.entry||p.lodgingEntry);const end=amsISO(p.exit);return !!start&&start<=day&&(!end||end>=day)}
 function amsLodgedOn(p,day){const start=amsISO(p.lodgingEntry),end=amsISO(p.lodgingExit);return !!start&&start<=day&&(!end||end>=day)}
 function amsDailyServices(p,day){const result=[0,0,0,0,0,0];const logs=state.services.filter(x=>String(x.id)===String(p.id));if(logs.length){logs.forEach(x=>{if(amsISO(x.date)===day&&Number.isInteger(Number(x.service))&&Number(x.service)>=0&&Number(x.service)<6)result[Number(x.service)]++})}else if(amsISO(p.entry)===day){(p.meals||[]).slice(0,6).forEach((v,i)=>result[i]=Number(v)||0)}return result}
 function amsKitOn(p,day){const start=amsISO(p.lodgingEntry);return start===day?(Array.isArray(p.kit)?p.kit:[1,1,1]):[0,0,0]}
@@ -564,8 +565,8 @@ function cargoReset(){return {type:'',code:'',providerName:'',description:'',rea
 function syncCargoProvider(){if(cargoType==='PR'){cargoProviderDraft.dni=val('cargoProviderDni');cargoProviderDraft.name=val('cargoProviderName')}}
 function switchCargo(doc){if(editingCargoNumber){alert('Estás completando '+editingCargoNumber+'. Guarda tus avances o finaliza el cargo antes de cambiar el tipo.');const selector=document.getElementById('cargoDocument');if(selector)selector.value=cargoType;return;}cargoType=['CH','PR','GE'].includes(doc)?doc:'';editingCargoNumber='';cargoLines=[cargoReset()];cargoMaterialType='';cargoProviderDraft={dni:'',name:''};render()}
 function cargoCategory(doc){return doc==='CH'?'Muestras para Oficina Chala':doc==='PR'?'Muestras para el proveedor':'Materiales en general'}
-function cargoStatus(c){return c.status==='INCOMPLETO'?'INCOMPLETO':'COMPLETO'}
-function cargoHistoryRows(items){return items.map(c=>[esc(c.number),esc(c.docType),esc(cargoCategory(c.docType)),esc(c.date),esc(c.name),`<b style="color:${cargoStatus(c)==='INCOMPLETO'?'#b45b00':'#13803e'}">${cargoStatus(c)}</b>`, `<button class="btn secondary smallbtn" onclick="viewCargo('${esc(c.number)}')">👁 Ver</button>`,cargoStatus(c)==='INCOMPLETO'?`<button class="btn smallbtn" onclick="editCargo('${esc(c.number)}')">✎ Completar</button>`:`<button class="btn secondary smallbtn" onclick="printCargoByNumber('${esc(c.number)}')">🖨 Imprimir</button>`])}
+function cargoStatus(c){return c.status==='ANULADO'?'ANULADO':c.status==='INCOMPLETO'?'INCOMPLETO':'COMPLETO'}
+function cargoHistoryRows(items){return items.map(c=>[esc(c.number),esc(c.docType),esc(cargoCategory(c.docType)),esc(c.date),esc(c.name),`<b style="color:${cargoStatus(c)==='INCOMPLETO'?'#b45b00':'#13803e'}">${cargoStatus(c)}</b>`, `<button class="btn secondary smallbtn" onclick="viewCargo('${esc(c.number)}')">👁 Ver</button>`,(cargoStatus(c)==='INCOMPLETO'?`<button class="btn smallbtn" onclick="editCargo('${esc(c.number)}')">✎ Completar</button>`:`<button class="btn secondary smallbtn" onclick="printCargoByNumber('${esc(c.number)}')">🖨 Imprimir</button>`) + (amsV82Eligible('cargo',c)&&c.status!=='ANULADO'?` <button class="btn secondary smallbtn" onclick="amsV82Edit('cargo','${esc(c.number)}')">✏️ Editar</button>${isAdminAMS()?` <button class="btn smallbtn" onclick="amsV82Action('cargo','${esc(c.number)}','ANULAR')">🚫 Anular</button> <button class="btn danger smallbtn" onclick="amsV82Action('cargo','${esc(c.number)}','ELIMINAR')">🗑️ Eliminar</button>`:''}`:'')])}
 const cargoHeaders=['N.º salida','Tipo','Descripción','Fecha y hora de envío','Responsable','Estado','Ver','Imprimir / Completar'];
 
 function amsNormalizeSampleCode(x){return String(x||'').trim().toUpperCase().replace(/\s+/g,'').replace(/-(A|B)$/,'')}
@@ -762,6 +763,85 @@ function roomAction(n){
 }
 function reserveRoomFor(n){showForm('RESERVAR HABITACIÓN '+n,`<div class="row">${field('A nombre de *','rName')}${field('Fecha prevista *','rDate','','date')}${field('Motivo *','rReason')}${field('Responsable *','rOwner')}</div>`,()=>{if(!val('rName')||!val('rDate')||!val('rReason')||!val('rOwner'))return alert('Completa los campos obligatorios.');if(roomStatus(n)!=='available')return alert('Habitación no disponible.');ask('¿Confirmar reserva de habitación '+n+'?',()=>{state.rooms[n]='reserved';state.reservations[n]={name:val('rName'),date:val('rDate'),reason:val('rReason'),owner:val('rOwner')};addLog('Reserva habitación '+n);closeForm()})})}
 function advance(i){const flow=['Pendiente','Coordinado','Confirmado','En laboratorio','Recepcionado','Enviado','Recibido','Finalizado'];ask('¿Avanzar solicitud al siguiente estado?',()=>{let x=state.requests[i];x.status=flow[Math.min(flow.length-1,flow.indexOf(x.status)+1)];addLog('Solicitud '+x.code+': '+x.status)})}
+
+// AMS V8.2 - UNA SOLA INTERFAZ DE CORRECCIONES. SOLO REGISTROS NUEVOS.
+const AMS_V82_CORTE=Date.parse('2026-10-19T17:09:39.783Z');
+function amsV82Eligible(entity,item){
+ if(!item||!currentSession()?.cloud)return false;
+ if(entity==='people')return Number(item.id)>=AMS_V82_CORTE || Number(item.eventId)>=AMS_V82_CORTE;
+ if(entity==='cargo'){
+  const m=/^(CH|PR|GE)-(\d+)$/.exec(String(item.number||''));
+  return !!m&&Number(m[2])>({CH:4,PR:1,GE:27}[m[1]]||0);
+ }
+ return false;
+}
+function amsV82Obj(entity,id){return (entity==='people'?state.people:state.cargo).find(x=>String(entity==='people'?x.id:x.number)===String(id));}
+function amsV82Field(k,label,value,type='text'){
+ const v=esc(value??'');
+ return `<label style="display:block;font-size:12px;margin:7px 0;min-width:190px">${esc(label)}<input data-ams-key="${esc(k)}" type="${type}" value="${v}" style="width:100%;font-size:14px;padding:8px;border:1px solid #bfd0df;border-radius:6px"></label>`;
+}
+function amsV82Modal(title,body,handler){
+ let d=document.getElementById('amsV82Dialog');if(d)d.remove();
+ d=document.createElement('dialog');d.id='amsV82Dialog';d.style.cssText='width:min(1000px,96vw);max-height:86vh;overflow:auto;border:0;border-radius:14px;padding:22px';
+ d.innerHTML=`<h3>${esc(title)}</h3><p class="hint">Modifica solo lo necesario. No se cambia el identificador del registro. Se sincronizará con Supabase y Google Sheets.</p>${body}<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px"><button type="button" id="amsV82Cancel" class="btn secondary">Cancelar</button><button type="button" id="amsV82Save" class="btn">Guardar corrección</button></div>`;
+ document.body.appendChild(d);d.querySelector('#amsV82Cancel').onclick=()=>d.close();
+ d.querySelector('#amsV82Save').onclick=()=>handler(d);
+ d.addEventListener('close',()=>d.remove());d.showModal();
+}
+function amsV82Edit(entity,id){
+ const rec=amsV82Obj(entity,id);
+ if(!amsV82Eligible(entity,rec)||rec?.status==='ANULADO')return alert('Solo se pueden modificar registros nuevos y activos.');
+ const peopleKeys=[['name','Nombres y apellidos'],['dni','DNI'],['phone','Celular'],['type','Tipo de persona'],['entry','Fecha y hora de ingreso'],['exit','Fecha y hora de salida'],['motive','Motivo de ingreso'],['plate','Placa'],['zone','Zona'],['license','N.º licencia'],['licensecat','Categoría'],['lots','N.º lotes'],['load','Detalle de carga'],['lotCode','Código lote'],['sacks','N.º sacos'],['guard','Guardia'],['shift','Turno'],['responsible','Responsable']];
+ const cargoKeys=[['name','Atención al cliente'],['driver','Conductor / proveedor'],['providerDni','DNI proveedor'],['providerName','Nombre proveedor'],['date','Fecha y hora'],['materialType','Tipo material'],['guard','Guardia'],['shift','Turno']];
+ const keys=entity==='people'?peopleKeys:cargoKeys;
+ let body=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:8px">${keys.map(([k,label])=>amsV82Field(k,label,rec[k])).join('')}</div>`;
+ const lineKeys=[['type','Tipo de muestra/material'],['code','Código'],['providerName','Proveedor ítem'],['description','Descripción'],['reason','Motivo de salida'],['quantity','Cantidad'],['unit','Unidad de medida'],['notes','Observaciones']];
+ if(entity==='cargo')body+=`<h4>Ítems existentes (${rec.lines?.length||0})</h4><p class="hint">Se conservan los mismos ítems y su orden para mantener los vínculos con Drive.</p>${(rec.lines||[]).map((x,i)=>`<fieldset data-ams-line="${i}" style="border:1px solid #d0dce9;padding:10px;border-radius:8px;margin-bottom:9px"><legend>Ítem ${i+1}</legend><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">${lineKeys.map(([k,label])=>amsV82Field(k,label,x[k])).join('')}</div></fieldset>`).join('')}`;
+ amsV82Modal('EDITAR '+(entity==='people'?'PERSONA ':'CARGO ')+id,body,d=>{
+  const next={...rec};
+  for(const [k] of keys){const field=d.querySelector(`[data-ams-key="${k}"]`);next[k]=field?.value.trim()??'';}
+  if(entity==='people'){
+   if(next.dni&&!/^\d{8}$/.test(next.dni))return alert('DNI: 8 dígitos.');
+   if(next.phone&&!/^\d{9}$/.test(next.phone))return alert('Celular: 9 dígitos.');
+   if(!next.name)return alert('Nombres y apellidos obligatorios.');
+   next.name=next.name.toLocaleUpperCase('es-PE');
+  }else{
+   next.lines=(rec.lines||[]).map((line,i)=>{
+     const box=d.querySelector(`[data-ams-line="${i}"]`),copy={...line};
+     for(const [k] of lineKeys)copy[k]=box.querySelector(`[data-ams-key="${k}"]`)?.value.trim()??'';
+     return copy;
+   });
+   if(next.docType==='GE'&&next.lines.some(x=>!x.description||!x.reason||!x.quantity||!x.unit))return alert('Completa descripción, motivo, cantidad y unidad de cada ítem.');
+  }
+  const changes=keys.some(([k])=>String(rec[k]??'')!==String(next[k]??''))||(entity==='cargo'&&JSON.stringify(rec.lines)!==JSON.stringify(next.lines));
+  if(!changes)return alert('No se detectaron modificaciones.');
+  if(!confirm('¿Guardar la corrección? Se enviará a Supabase y posteriormente a Google Sheets.'))return;
+  Object.assign(rec,next,{updated:now(),modifiedBy:currentSession()?.name||'',modifiedAt:new Date().toISOString()});
+  addLog('EDITAR '+entity+' '+id+' por '+(currentSession()?.name||''));
+  d.close();save();render();
+  alert('Cambio registrado. Comprueba PENDIENTES: 0 y CONFLICTOS: 0 antes de darlo por sincronizado.');
+ });
+}
+function amsV82Action(entity,id,accion){
+ if(!isAdminAMS())return alert('Solo el administrador puede anular o eliminar.');
+ const rec=amsV82Obj(entity,id);
+ if(!amsV82Eligible(entity,rec)||rec?.status==='ANULADO')return alert('Operación no permitida: registro anterior al corte o ya anulado.');
+ const motivo=prompt('Motivo obligatorio para '+accion+' el registro '+id+':');
+ if(motivo===null)return;
+ if(motivo.trim().length<5)return alert('Indica un motivo de al menos 5 caracteres.');
+ if(!confirm('¿Confirmas '+accion+' '+entity+' '+id+'? Se conservará el historial de auditoría.'))return;
+ const actor=currentSession()?.name||'ADMINISTRADOR';
+ if(accion==='ANULAR'){
+  rec.status='ANULADO';rec.amsStatus='ANULADO';rec.annulReason=motivo.trim();rec.annulledBy=actor;rec.annulledAt=new Date().toISOString();
+ }else if(accion==='ELIMINAR'){
+  const arr=entity==='people'?state.people:state.cargo;
+  const pos=arr.indexOf(rec);if(pos<0)return;
+  arr.splice(pos,1); // Supabase recibe deleted=true por el mecanismo de cambios existente.
+ }
+ addLog(accion+' '+entity+' '+id+' por '+actor+' · Motivo: '+motivo.trim());
+ save();render();
+ alert('Operación registrada. Espera confirmación de Supabase y Drive antes de considerarla finalizada.');
+}
 </script>
 
 <style>
@@ -772,9 +852,10 @@ function advance(i){const flow=['Pendiente','Coordinado','Confirmado','En labora
 <div id="amsLogin" hidden><form class="ams-login-card" onsubmit="return loginAMS(event)"><h2>AMS ACOPIO</h2><p id="amsLoginCaption">Acceso al sistema</p><div class="field"><label>RESPONSABLE *</label><select id="amsLoginName" required><option value="">Seleccione responsable</option><option value="NOHELLY INGA VENTURA">NOHELLY INGA VENTURA</option><option value="CESAR LUQUE OTOYA">CESAR LUQUE OTOYA</option><option value="SAUL SILVA RIOJA">SAUL SILVA RIOJA</option><option value="SUGELLY CONTRERAS CAJA">SUGELLY CONTRERAS CAJA</option><option value="ADMINISTRADOR">ADMINISTRADOR</option></select></div><div class="field" id="amsLoginGuardWrap"><label>GUARDIA *</label><select id="amsLoginGuard"><option value="">Seleccione</option><option>A</option><option>B</option><option>C</option></select></div><div class="field" id="amsLoginShiftWrap"><label>TURNO *</label><select id="amsLoginShift"><option value="">Seleccione</option><option>Día</option><option>Noche</option></select></div><div class="field" id="amsLoginPinWrap" hidden><label>PIN DEL ADMINISTRADOR *</label><input id="amsLoginPin" type="password" inputmode="numeric" minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="4 a 8 dígitos" autocomplete="off"></div><div class="ams-login-error" id="amsLoginError" aria-live="polite"></div><button class="btn" type="submit">Ingresar al sistema</button><p class="hint" id="amsPinHelp"></p></form></div>
 <script>
 const AMS_OPERATORS=['NOHELLY INGA VENTURA','CESAR LUQUE OTOYA','SAUL SILVA RIOJA','SUGELLY CONTRERAS CAJA'];
-function adminRecordsAMS(){const keys=['people','guides','requests','cargo','services','users','sacks','logs','cleanings','inventoryMoves'];return head('4.4 REGISTROS','Administración local: consultar, editar y eliminar registros. Los cambios son permanentes en este navegador.')+keys.map(k=>panel(k.toUpperCase()+' ('+(state[k]||[]).length+')',table(['N.º','Detalle','Acciones'],(state[k]||[]).map((x,i)=>[i+1,esc(JSON.stringify(x)).slice(0,190),btn('Editar',`adminEditAMS('${k}',${i})`,'secondary smallbtn')+' '+btn('Eliminar',`adminDeleteAMS('${k}',${i})`,'danger smallbtn')])))).join('')}
-function adminEditAMS(k,i){if(!isAdminAMS())return;const current=state[k]?.[i];if(!current)return;const updated=prompt('Editar registro JSON (conserva los campos necesarios):',JSON.stringify(current,null,2));if(updated===null)return;try{const obj=JSON.parse(updated);if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('Formato inválido');ask('¿Guardar los cambios en el registro?',()=>{state[k][i]=obj;addLog('Administrador editó '+k+' #'+(i+1))})}catch(e){alert('JSON inválido: '+e.message)}}
-function adminDeleteAMS(k,i){if(!isAdminAMS())return;ask('¿Eliminar definitivamente el registro '+(i+1)+' de '+k+'?',()=>{state[k].splice(i,1);addLog('Administrador eliminó '+k+' #'+(i+1))})}
+function adminRecordsAMS(){
+return head('4.4 REGISTROS','Las correcciones operativas se gestionan desde 1.2 HISTORIAL y 1.5 CARGOS. Los históricos anteriores al corte no se modifican.')+
+ panel('GESTIÓN DE REGISTROS',`<p>Para corregir personas o ingresos nuevos utiliza <b>1.2 HISTORIAL</b>; para cargos nuevos utiliza <b>1.5 CARGOS</b>. Los cambios quedarán pendientes hasta confirmar Supabase y Drive.</p>${btn('Ir a historial',"setPage('1.2')")}${btn('Ir a cargos',"setPage('1.5')",'secondary')}`)
+}
 const AMS_SESSION_KEY='ams-demo-active-session-v1',AMS_ADMIN_PIN_KEY='ams-demo-admin-pin-v1';
 function currentSession(){try{return JSON.parse(sessionStorage.getItem(AMS_SESSION_KEY)||'null')}catch(e){return null}}
 function updateLoginRoleAMS(){

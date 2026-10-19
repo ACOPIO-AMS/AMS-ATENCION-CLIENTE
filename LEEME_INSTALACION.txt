@@ -1,75 +1,63 @@
-AMS ACOPIO V8 — CAMBIOS SOLICITADOS (17 OCT 2026)
+AMS ACOPIO V8.2 - ACTUALIZACIÓN UNIFICADA (19/10/2026)
 ===================================================
+NO CREAR OTROS PROYECTOS, ARCHIVOS .GS NI ACTIVADORES.
 
-ESTADO
-- Versión preparada para instalación; NO está publicada en GitHub Pages.
-- Se verificó sintaxis y se probaron los formularios esenciales en navegador con datos simulados.
-- No se han escrito ni borrado registros de Supabase ni Google Sheets.
-- Para instalar los cambios se requieren acciones en GitHub y Supabase.
+CAMBIOS INCLUIDOS
+- INDEX: acciones EDITAR / ANULAR / ELIMINAR para nuevos registros de personas
+  (1.2 HISTORIAL) y cargos (1.5 CARGOS).
+- Usuario operativo: puede EDITAR. ADMINISTRADOR: puede EDITAR, ANULAR, ELIMINAR.
+- Edición mediante formulario, sin JSON. Identificador no cambia.
+- Anulación y eliminación lógica se registran en la cola de Supabase.
+- Los registros anteriores al corte no se habilitan en esta versión.
+- Apps Script: usa el AMS_CONTROL_CAMBIOS.gs existente y un único
+  activador compartido con la sincronización de catálogos.
+- Función ams-drive-events: se filtra a personas/cargos para que logs,
+  servicios y limpieza no impidan procesar cambios operativos.
 
-ARCHIVOS
-1) index.html             Aplicación con ajustes del documento.
-2) ams-cloud.js           Login, sesión y búsqueda autenticada DNI/RUC.
-3) config.js              Dirección de ams-api-v7 + nueva consulta.
-4) ams-consultas-index.ts Nueva Edge Function. SOLO lectura con token válido.
-5) 01_RENOMBRAR_USUARIO.sql  Corrige el nombre de Sugelly sin borrar contraseña.
-6) 02_RESPALDO_BD_SALIDAS.gs  Script separado de respaldo en MATRIZ PROVEEDORES.
+INSTALACIÓN (EN ESTE ORDEN, GUARDANDO RESPALDO ANTES)
+1) SUPABASE: Edge Functions > ams-drive-events > Code > index.ts.
+   Reemplazar el contenido por ams-drive-events-index.ts y publicar.
+   Conservar el secreto AMS_DRIVE_SYNC_TOKEN y Verify JWT legacy en OFF.
+2) APPS SCRIPT, PROYECTO YA EXISTENTE "AMS - SINCRONIZACION CATALOGOS":
+   abrir AMS_CONTROL_CAMBIOS.gs. REEMPLAZAR solamente su contenido por
+   AMS_CONTROL_CAMBIOS.gs de este paquete. No tocar Código.gs.
+   Los archivos AMS_V82_VINCULOS.gs y AMS_V82_INICIO.gs pueden quedar
+   sin ejecutar; no hay que borrar nada.
+3) GITHUB: guardar respaldo del index.html actual y REEMPLAZAR únicamente
+   index.html por el de este paquete. NO cambiar ams-cloud.js ni config.js.
+   Después de publicar actualizar la página con Ctrl+F5.
+4) VERIFICAR SIN ESCRIBIR: en Apps Script ejecutar
+   AMS_V82_previsualizarSincronizacion. Examinar errores y posibles eventos.
+5) ENSAYO: crear un ingreso de prueba nuevo en la aplicación, esperar
+   Supabase sincronizado y ejecutar de nuevo la previsualización.
+   Confirmar que aparece CREAR VINCULOS NUEVOS (nunca sobre históricos).
+6) SI TODO CORRECTO: ejecutar AMS_V82_habilitarEscritura una sola vez,
+   luego AMS_V82_sincronizarRegistrosNuevos. Verificar fila NUEVA en Drive
+   con una nota AMS2 en su celda de columna A y evento SINCRONIZADO en
+   Supabase. Para terminar ejecutar AMS_V82_instalarActivadorUnico.
+   Esta última elimina SOLO los activadores de sincronización anteriores
+   especificados y crea UNO cada 10 minutos: AMS_V82_cicloUnico.
 
-QUÉ CAMBIÓ EN EL INDEX
-- Nombre mostrado de SUGELLY CONTRERAS CAJA.
-- Administrador: solo PIN; operarios: usuario y contraseña. Sin código dispositivo.
-- DNI y celular: solo dígitos; límite 8/9; nombres en MAYÚSCULAS.
-- Lotes: solo números; detalle de carga permite texto y números.
-- Historial: todas las personas a la vista, agrupación reconocible por placa;
-  sin expandir/ocultar y sin 3 tarjetas grandes; tabla compacta.
-- Estadía y servicios: tres tarjetas (personas, alimentos, habitaciones)
-  manteniendo las operaciones que están debajo.
-- Cargos: mantiene las filas de ítems dinámicas (mínimo 8 en impresión,
-  crecen con cantidad registrada); respeta los diseños A4 existentes.
-- Reporte alimentación: fecha y hora completas del ingreso y ajuste
-  tipográfico en impresión.
-- Búsqueda DNI por Supabase en 1.1 y consulta DNI/RUC en 4.5.
-- Preparado script de envío a BD SALIDAS (NO activado).
+ATENCIÓN - LIMITACIONES
+- NO habilitar sobre registros reales sin ensayo extremo a extremo.
+- El código del backend ams-api-v7 está publicado por el usuario, pero aquí
+  no pudo verificarse su respuesta real con registros COMPLETOS.
+  Si la API responde CARGO_CERRADO al editar un cargo finalizado, se requerirá
+  ajustar esa validación del backend de forma controlada; NO forzar la operación.
+- No permite cambiar el número de ítems de un cargo ya vinculado a Drive;
+  para editar su contenido se mantienen los ítems y el orden existente.
+- La eliminación en Google Sheets es lógica: nota en columna A + resaltado,
+  y para CH/PR estado en H. No se borran filas históricas.
+- Esta versión no edita el maestro BD CLIENTES desde cambios operativos;
+  conserva la sincronización de catálogos ya instalada.
+- El mecanismo de sincronización utiliza eventos existentes de Supabase,
+  no descarga los registros completos y no duplica filas ya vinculadas.
+- Verificar el indicador PENDIENTES / CONFLICTOS de AMS ACOPIO: una acción
+  visible en pantalla NO significa automáticamente que haya llegado a Drive.
 
-INSTALACIÓN RECOMENDADA EN ESTE ORDEN
-1. Respaldar el index.html, ams-cloud.js y config.js actuales de GitHub.
-2. Supabase -> SQL Editor: ejecutar 01_RENOMBRAR_USUARIO.sql una vez.
-   Verificar usuario y contraseña conservada en el SELECT final.
-3. Supabase -> Edge Functions: crear 'ams-consultas', pegar todo
-   ams-consultas-index.ts y publicar. Verify JWT with legacy secret OFF.
-   Requiere secretos predeterminados SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
-   y el existente AMS_ALLOWED_ORIGINS=https://acopio-ams.github.io.
-   NO usar la clave de importación de catálogos en el frontend.
-4. ANTES de reemplazar la web, probar consulta con token de administrador
-   desde la consola de Supabase, sin mostrar token ni PIN públicamente:
-   POST {"tipo":"dni","valor":"DNI_EXISTENTE"} con Header
-   Authorization: Bearer <TOKEN_DE_SESION_ADMIN>.
-   Verificar ok:true y datos correctos. Repetir tipo:ruc con 11 dígitos.
-5. En GitHub ACOPIO-AMS/AMS-ATENCION-CLIENTE, reemplazar SOLO
-   index.html, ams-cloud.js y config.js en un mismo commit.
-6. Esperar despliegue GitHub Pages, refrescar Ctrl+F5.
-   Probar como admin (solo PIN) y un operario (usuario+clave).
-   Probar DNI, historial con varias personas, cargos y reportes.
-7. Separadamente, cuando autorices respaldo a BD SALIDAS, instalar
-   02_RESPALDO_BD_SALIDAS.gs en proyecto Apps Script independiente
-   con acceso al libro MATRIZ PROVEEDORES; configurar propiedades:
-   AMS2_API_URL: https://oxadhudyjkviidnwyzpf.supabase.co/functions/v1/ams-api-v7
-   AMS2_BACKUP_TOKEN: la misma clave privada que AMS_BACKUP_TOKEN en Supabase.
-   Ejecutar primero AMS2_probarConexion; después AMS2_actualizar MANUAL;
-   comprobar que NO se han modificado estados RECEPTADOS/RECIBIDOS.
-   Solo después ejecutar AMS2_instalar (activador cada 10 min).
-   Este archivo ya abre MATRIZ PROVEEDORES por el ID conocido del libro.
-   Verifica que ese ID siga siendo el mismo y que Apps Script tenga acceso.
-
-SEGURIDAD
-- Claves de Supabase no están incluidas en index, config ni cloud.
-- Usuarios nuevos siguen creándose desde 4.2, mediante API autenticada.
-- App en GitHub Pages es pública: los catálogos exigen token personal válido.
-- El script 02 NO debe desplegarse como aplicación web pública.
-
-PENDIENTES DE VALIDACIÓN EN PRODUCCIÓN
-- Función ams-consultas y prueba real DNI/RUC tras instalarla.
-- Migración del nombre de Sugelly en Supabase.
-- Respaldo de BD SALIDAS sin duplicados en el libro existente.
-- Prueba de carga e impresión con >8 ítems en A4.
-- Se conservan 39 filas históricas omitidas del catálogo, sin editarlas.
+VALIDACIONES REALIZADAS EN ENTORNO DE PRUEBA LOCAL
+- Sintaxis de los 5 bloques JavaScript y script de Apps Script.
+- Interfaz: permisos, identificación de nuevos registros y botones.
+- Mock del puente: CREAR, reintento idempotente, EDITAR, ANULAR,
+  ELIMINAR, y cargos GE con varios ítems; no se duplicaron filas.
+- SIN pruebas directas contra las bases operativas del usuario.
