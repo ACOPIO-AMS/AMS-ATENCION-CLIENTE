@@ -222,7 +222,47 @@ dialog{border:0;border-radius:14px;padding:24px;max-width:440px;width:calc(100% 
 .h12-info{font-size:12px;padding:3px 0 9px;color:#385c79}
 .stay-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media(max-width:700px){.stay-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.stay-cards .card{padding:8px;font-size:10px}.stay-cards .card b{font-size:18px}}
-</style></head><body>
+</style><style>
+/* AMS V8.3 */
+#app .field.ams-falta-obligatorio>input,
+#app .field.ams-falta-obligatorio>select,
+#app .field.ams-falta-obligatorio>textarea{background:#fff0f1!important;border:1.5px solid #db717c!important;box-shadow:0 0 0 1px #fbd0d4;color:#263c54}
+#app .field.ams-falta-obligatorio>label{color:#a5303e;font-weight:750}
+.ams-v83-action-select{width:125px;max-width:135px;padding:7px 5px;border:1px solid #bbd3e7;border-radius:6px;color:#0d4b78;background:#eef6fd;min-height:34px;font-size:12px;vertical-align:middle}
+.ams-v83-inline-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0}
+.h12-actions{white-space:normal!important;min-width:185px}
+.h12-actions button{white-space:nowrap}
+@media(max-width:700px){
+ .h12-compact-wrap,.h12-compact-wrap.scroll,#cargoHistory .scroll{overflow:visible!important}
+ .h12-table.h12-compact,#cargoHistory table{display:block;width:100%!important;min-width:0!important;table-layout:auto!important}
+ .h12-table.h12-compact thead,#cargoHistory thead{display:none}
+ .h12-table.h12-compact tbody,#cargoHistory tbody{display:block}
+ .h12-table.h12-compact tbody tr,#cargoHistory tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:12px 10px;margin:0 0 12px;background:white!important;border:1px solid #d0dfed;border-radius:10px;box-shadow:0 2px 6px #1234560a;}
+ .h12-table.h12-compact tbody td,#cargoHistory tbody td{display:block;width:auto!important;padding:4px 3px;border:0!important;background:transparent!important;min-width:0;overflow-wrap:anywhere;white-space:normal!important;font-size:12px}
+ .h12-table.h12-compact tbody td::before,#cargoHistory tbody td::before{display:block;font-weight:700;font-size:9px;letter-spacing:.02em;color:#52718b;margin-bottom:3px}
+ .h12-table.h12-compact td:nth-child(1)::before{content:'FECHA Y HORA'}
+ .h12-table.h12-compact td:nth-child(2)::before{content:'PLACA / PERSONAS'}
+ .h12-table.h12-compact td:nth-child(3)::before{content:'TIPO'}
+ .h12-table.h12-compact td:nth-child(4)::before{content:'NOMBRES Y APELLIDOS'}
+ .h12-table.h12-compact td:nth-child(5)::before{content:'MOTIVO'}
+ .h12-table.h12-compact td:nth-child(6)::before{content:'ZONA'}
+ .h12-table.h12-compact td:nth-child(7)::before{content:'LOTES / DETALLE'}
+ .h12-table.h12-compact td:nth-child(8)::before{content:'ESTADO'}
+ .h12-table.h12-compact td:nth-child(9){grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+ .h12-table.h12-compact td:nth-child(9)::before{content:'ACCIONES';flex-basis:100%}
+ #cargoHistory tbody td:nth-child(1)::before{content:'N.º CARGO'}
+ #cargoHistory tbody td:nth-child(2)::before{content:'TIPO'}
+ #cargoHistory tbody td:nth-child(3)::before{content:'DESCRIPCIÓN'}
+ #cargoHistory tbody td:nth-child(4)::before{content:'FECHA'}
+ #cargoHistory tbody td:nth-child(5)::before{content:'RESPONSABLE'}
+ #cargoHistory tbody td:nth-child(6)::before{content:'ESTADO'}
+ #cargoHistory tbody td:nth-child(7){grid-column:1/-1}
+ #cargoHistory tbody td:nth-child(7)::before{content:'ACCIONES'}
+ .h12-actions{min-width:0!important}
+ .ams-v83-action-select{width:123px}.ams-v83-inline-actions .smallbtn{padding:6px 7px;font-size:11px}
+}
+</style>
+</head><body>
 <header><div><h1>AMS ACOPIO</h1><small>Analytica Mineral Services SAC · Gestión de operaciones</small></div><span class="tag">MODO LOCAL · CONFIGURA SUPABASE</span></header>
 <div class="layout"><aside id="sidebar"></aside><main id="app"></main></div><nav id="mobileNav" aria-label="Navegación de Atención al Cliente"></nav>
 <dialog id="confirm"><h3 id="ctitle">Confirmar acción</h3><p id="cmsg" class="muted"></p><menu><button class="btn secondary" onclick="confirmDialog.close()">Cancelar</button><button class="btn" id="accept">Sí, confirmar</button></menu></dialog>
@@ -248,10 +288,30 @@ function isAdminAMS(){return currentSession()?.role==='admin'}
 function canAccessAMS(id){return isAdminAMS()||id.startsWith('1.')}
 function setPage(id){if(!canAccessAMS(id))return;if(id==='1.1'&&active!=='1.1'){entryOpenedAt=now()}active=id;render();window.scrollTo(0,0)}
 const amsIcons={'1.1':'✎','1.2':'✓','1.3':'♨','1.4':'⌂','1.5':'▤','1.6':'▥','2.1':'▣','3.1':'▦','4.1':'⚙'};
-function render(){if(!canAccessAMS(active))active='1.1';document.getElementById('sidebar').innerHTML=nav.filter(([g,subs])=>isAdminAMS()||g.startsWith('1.')).map(([g,subs])=>`<div class="navgroup"><strong>${g}</strong>${subs.map(([id,n])=>`<button class="nav ${id===active?'active':''}" onclick="setPage('${id}')"><span class="nav-icon" aria-hidden="true">${amsIcons[id]||'◇'}</span><span>${id} ${n}</span></button>`).join('')}</div>`).join('');document.getElementById('app').innerHTML=page();const mobile=document.getElementById('mobileNav');if(mobile)mobile.innerHTML=nav[0][1].map(([id,n])=>`<button type="button" class="mobile-nav-item ${active===id?'active':''}" aria-label="${id} ${n}" ${active===id?'aria-current="page"':''} onclick="setPage('${id}')"><span class="mobile-nav-icon" aria-hidden="true">${amsIcons[id]||'◇'}</span><span class="mobile-nav-text">${n}</span></button>`).join('')}
+function render(){if(!canAccessAMS(active))active='1.1';document.getElementById('sidebar').innerHTML=nav.filter(([g,subs])=>isAdminAMS()||g.startsWith('1.')).map(([g,subs])=>`<div class="navgroup"><strong>${g}</strong>${subs.map(([id,n])=>`<button class="nav ${id===active?'active':''}" onclick="setPage('${id}')"><span class="nav-icon" aria-hidden="true">${amsIcons[id]||'◇'}</span><span>${id} ${n}</span></button>`).join('')}</div>`).join('');document.getElementById('app').innerHTML=page();const mobile=document.getElementById('mobileNav');if(mobile)mobile.innerHTML=nav[0][1].map(([id,n])=>`<button type="button" class="mobile-nav-item ${active===id?'active':''}" aria-label="${id} ${n}" ${active===id?'aria-current="page"':''} onclick="setPage('${id}')"><span class="mobile-nav-icon" aria-hidden="true">${amsIcons[id]||'◇'}</span><span class="mobile-nav-text">${n}</span></button>`).join('');requestAnimationFrame(amsResaltarObligatorios_)}
 
 
 let motiveSelected='',cargoCase='',extraPeople=[],entryDraft={},entryOpenedAt=now();
+// AMS V8.3: marcar con rojo suave solo campos obligatorios vacíos o inválidos.
+function amsResaltarObligatorios_(){
+ const root=document.getElementById('app');if(!root)return;
+ for(const wrap of root.querySelectorAll('.field')){
+  const label=wrap.querySelector('label'),field=wrap.querySelector('input,select,textarea');
+  if(!label||!field)continue;
+  const obligatorio=label.textContent.includes('*') && !field.disabled && field.getClientRects().length>0;
+  if(!obligatorio){wrap.classList.remove('ams-falta-obligatorio');continue;}
+  const value=String(field.value||'').trim();
+  const sinDato=!value||/^(SELECCIONE|SELECCIONAR)$/i.test(value);
+  const dni=/^(driverdni|mainDni|extraDni\d+)$/i.test(field.id);
+  const phone=/^(driverphone|mainPhone|extraPhone\d+)$/i.test(field.id);
+  const invalid=sinDato||(dni&&!/^\d{8}$/.test(value))||(phone&&!/^\d{9}$/.test(value));
+  wrap.classList.toggle('ams-falta-obligatorio',invalid);
+  field.setAttribute('aria-invalid',String(invalid));
+ }
+}
+document.addEventListener('input',e=>{if(e.target.closest?.('#app'))amsResaltarObligatorios_()});
+document.addEventListener('change',e=>{if(e.target.closest?.('#app'))requestAnimationFrame(amsResaltarObligatorios_)});
+
 function resetEntryClock(){entryOpenedAt=now()}
 
 const motives=['Ingreso de carga','Verificar su proceso presencial','Remuestreo (RM)','Recoger muestra','Retiro de lote'];
@@ -265,7 +325,43 @@ function restoreDraft(){for(const [id,v] of Object.entries(entryDraft)){const el
 function txt(label,id,placeholder='',type='text',disabled=false){
 const dni=/^(driverdni|mainDni|extraDni\d+)$/.test(id),phone=/^(driverphone|mainPhone|extraPhone\d+)$/.test(id),lots=/^(lots|mainLots|extraLots\d+)$/.test(id),isName=/^(drivername|mainName|extraName\d+)$/.test(id),num=dni||phone||lots,limit=dni?8:phone?9:lots?5:0;
 return `<div class="field"><label>${label}</label><input id="${id}" type="${num?'text':type}" inputmode="${num?'numeric':'text'}" ${num?`pattern="[0-9]{${lots?'0,'+limit:limit}}"`:''} autocomplete="off" placeholder="${placeholder}" ${disabled?'disabled':''} value="${esc(entryDraft[id]||'')}" ${num?`oninput="numericChanged(this,${limit})"`:isName?'oninput="this.value=this.value.toLocaleUpperCase(\'es-PE\')"':''} ${dni?`onblur="autofillDni('${id}')"`:''}></div>`}
-function numericChanged(el,limit){const old=el.value;el.value=old.replace(/\D/g,'').slice(0,limit);if(el.value!==old)el.setCustomValidity('');if(/^((driverdni)|(mainDni)|(extraDni\d+))$/.test(el.id)&&el.value.length===8)autofillDni(el.id)}
+// AMS V8.3: Nunca conservar datos asociados a un DNI que el operario ha cambiado.
+function amsDniDependientes_(id){
+ const extra=/^extraDni(\d+)$/.exec(id);
+ if(extra)return {fields:['extraName'+extra[1],'extraPhone'+extra[1]],extraIndex:Number(extra[1])};
+ if(id==='driverdni')return {fields:['drivername','driverphone','license','licensecat'],extraIndex:-1};
+ if(id==='mainDni')return {fields:['mainName','mainPhone'],extraIndex:-1};
+ return {fields:[],extraIndex:-1};
+}
+function amsDniCambió_(el){
+ const actual=String(el.value||'');
+ if(el.dataset.amsLastDni===actual)return false;
+ el.dataset.amsLastDni=actual;
+ el.dataset.amsResolvedDni='';
+ el.dataset.amsRequest=String((Number(el.dataset.amsRequest)||0)+1); // invalida respuestas anteriores
+ const {fields,extraIndex}=amsDniDependientes_(el.id);
+ for(const key of fields){
+  const dep=document.getElementById(key);
+  if(dep)dep.value=(dep.tagName==='SELECT'?'Seleccione':'');
+  if(extraIndex<0)entryDraft[key]='';
+ }
+ if(extraIndex>=0&&extraPeople[extraIndex]){
+  extraPeople[extraIndex].name='';extraPeople[extraIndex].phone='';
+ }
+ if(el.id==='driverdni'){
+  const note=document.getElementById('clientLookupStatus');
+  if(note)note.textContent=actual.length===8?'Buscando DNI...':'Ingresa 8 dígitos para consultar. Los datos anteriores fueron limpiados.';
+ }
+ return true;
+}
+function numericChanged(el,limit){
+ const old=el.value;el.value=old.replace(/\D/g,'').slice(0,limit);
+ if(el.value!==old)el.setCustomValidity('');
+ if(/^(driverdni|mainDni|extraDni\d+)$/.test(el.id)){
+  const changed=amsDniCambió_(el);
+  if(changed&&el.value.length===8)void autofillDni(el.id);
+ }
+}
 function clientCatalog(){
 const catalog=new Map();
 for(const p of [...state.people].reverse()){
@@ -277,12 +373,26 @@ return catalog;
 }
 async function autofillDni(id){
  const input=document.getElementById(id), dni=input?.value||'';
- if(!/^\d{8}$/.test(dni))return;
+ if(!input)return;
+ if(!/^\d{8}$/.test(dni)){
+  amsDniCambió_(input);
+  return;
+ }
+ // Evitar consultas duplicadas al perder foco y preservar correcciones manuales de celular/licencia.
+ if(input.dataset.amsResolvedDni===dni)return;
+ const request=String((Number(input.dataset.amsRequest)||0)+1);
+ input.dataset.amsRequest=request;
  let found=null;
  try{found=await window.AMSCloud?.lookupCatalog?.('dni',dni)}catch(e){console.warn('Consulta de DNI sin respuesta:',e.message)}
  if(!found)found=clientCatalog().get(dni);
- // Si el operario siguió escribiendo, descartar una respuesta desactualizada.
- if(!found||input.value!==dni)return;
+ // Si el DNI cambió durante la petición, NO reescribir otros campos.
+ if(!document.contains(input)||input.value!==dni||input.dataset.amsRequest!==request)return;
+ if(!found){
+  const note=document.getElementById('clientLookupStatus');
+  if(note&&id==='driverdni')note.textContent='DNI no encontrado. Completa los datos manualmente.';
+  return;
+ }
+ input.dataset.amsResolvedDni=dni;
  const extra=id.match(/^extraDni(\d+)$/);
  const suffix=extra?extra[1]:'';
  const mappings=extra
@@ -331,6 +441,7 @@ if (target === 'licensecat') {
   else{const i=Number(suffix);if(extraPeople[i])extraPeople[i][/Name/.test(target)?'name':'phone']=normalized;}
  }
  const note=document.getElementById('clientLookupStatus');if(note)note.textContent='✓ DNI encontrado. Datos autocompletados, verifica antes de guardar.';
+ amsResaltarObligatorios_();
 }
 function lookupRucIfPresent(id,rucNameId){
  const el=document.getElementById(id),ruc=el?.value||'';
@@ -354,7 +465,7 @@ function driverForm(){return `<div class="row" style="justify-content:space-betw
 function renderRegister(){
 let out=head('1.1 REGISTRAR PROVEEDOR','Registro de ingresos según el motivo seleccionado. Los formularios aparecen únicamente después de elegir una opción.');if(regularizeTarget)out+=`<div class="regularize-head"><b>✎ REGULARIZAR INGRESO EXISTENTE</b><p>Completa los campos pendientes. Al guardar se actualizará el mismo ingreso, sin duplicar personas ni cambiar su fecha de ingreso.</p></div>`;
 out+=panel('A. DATOS GENERALES',`<div class="row"><div class='field'><label>Fecha y hora de ingreso (automática)</label><input value='${esc(regularizeTarget?'Fecha original conservada':entryOpenedAt)}' disabled></div></div>`);
-out+=panel('B. MOTIVO DE INGRESO',`<div class="row"><div class="field"><label>Seleccionar motivo de ingreso</label><select id="motiveSelect" onchange="changeMotive()"><option value="">Seleccione motivo...</option>${motives.map(m=>`<option value="${esc(m)}" ${motiveSelected===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div></div>`);
+out+=panel('B. MOTIVO DE INGRESO',`<div class="row"><div class="field"><label>Seleccionar motivo de ingreso *</label><select id="motiveSelect" onchange="changeMotive()"><option value="">Seleccione motivo...</option>${motives.map(m=>`<option value="${esc(m)}" ${motiveSelected===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div></div>`);
 if(!motiveSelected)return out+`<div class="notice">Selecciona un motivo de ingreso para visualizar los campos correspondientes.</div>`;
 const vehicle=['Ingreso de carga','Retiro de lote'].includes(motiveSelected);
 if(vehicle){
@@ -459,7 +570,7 @@ function historyPage(){
   const annulled=p.status==='ANULADO';
   const action=pending?`startRegularize('${g.id}')`:`detailPerson(${p.id})`;
   const detail=[p.lots?'Lotes: '+p.lots:'',p.lotCode||p.load||''].filter(Boolean).join(' · ')||'—';
-  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending||annulled?'bad':''}">${annulled?'ANULADO':pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions"><button onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button>${amsV82Eligible('people',p)&&!annulled?` <button onclick="amsV82Edit('people','${p.id}')">✏️ Editar</button>${isAdminAMS()?` <button onclick="amsV82Action('people','${p.id}','ANULAR')">🚫 Anular</button> <button onclick="amsV82Action('people','${p.id}','ELIMINAR')">🗑️ Eliminar</button>`:''}`:''}</td></tr>`;
+  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending||annulled?'bad':''}">${annulled?'ANULADO':pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions"><button onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button>${!annulled?amsV83Menu('people',p.id):''}</td></tr>`;
  }));
  out+='</tbody></table></section>';
  setTimeout(()=>{for(const [id,v] of Object.entries({hsearch:historyFilters.q,hfrom:historyFilters.from,hto:historyFilters.to,hmotive:historyFilters.motive,hstatus:historyFilters.status})){const el=document.getElementById(id);if(el)el.value=v}},0);
@@ -566,8 +677,17 @@ function syncCargoProvider(){if(cargoType==='PR'){cargoProviderDraft.dni=val('ca
 function switchCargo(doc){if(editingCargoNumber){alert('Estás completando '+editingCargoNumber+'. Guarda tus avances o finaliza el cargo antes de cambiar el tipo.');const selector=document.getElementById('cargoDocument');if(selector)selector.value=cargoType;return;}cargoType=['CH','PR','GE'].includes(doc)?doc:'';editingCargoNumber='';cargoLines=[cargoReset()];cargoMaterialType='';cargoProviderDraft={dni:'',name:''};render()}
 function cargoCategory(doc){return doc==='CH'?'Muestras para Oficina Chala':doc==='PR'?'Muestras para el proveedor':'Materiales en general'}
 function cargoStatus(c){return c.status==='ANULADO'?'ANULADO':c.status==='INCOMPLETO'?'INCOMPLETO':'COMPLETO'}
-function cargoHistoryRows(items){return items.map(c=>[esc(c.number),esc(c.docType),esc(cargoCategory(c.docType)),esc(c.date),esc(c.name),`<b style="color:${cargoStatus(c)==='INCOMPLETO'?'#b45b00':'#13803e'}">${cargoStatus(c)}</b>`, `<button class="btn secondary smallbtn" onclick="viewCargo('${esc(c.number)}')">👁 Ver</button>`,(cargoStatus(c)==='INCOMPLETO'?`<button class="btn smallbtn" onclick="editCargo('${esc(c.number)}')">✎ Completar</button>`:`<button class="btn secondary smallbtn" onclick="printCargoByNumber('${esc(c.number)}')">🖨 Imprimir</button>`) + (amsV82Eligible('cargo',c)&&c.status!=='ANULADO'?` <button class="btn secondary smallbtn" onclick="amsV82Edit('cargo','${esc(c.number)}')">✏️ Editar</button>${isAdminAMS()?` <button class="btn smallbtn" onclick="amsV82Action('cargo','${esc(c.number)}','ANULAR')">🚫 Anular</button> <button class="btn danger smallbtn" onclick="amsV82Action('cargo','${esc(c.number)}','ELIMINAR')">🗑️ Eliminar</button>`:''}`:'')])}
-const cargoHeaders=['N.º salida','Tipo','Descripción','Fecha y hora de envío','Responsable','Estado','Ver','Imprimir / Completar'];
+function cargoHistoryRows(items){return items.map(c=>{
+ const n=esc(c.number),status=cargoStatus(c);
+ const view=`<button class="btn secondary smallbtn" onclick="viewCargo('${n}')">👁 Ver</button>`;
+ // Cualquier cargo guardado y numerado conserva la opción de impresión sin crear otro registro.
+ const printing=!n.startsWith('TMP-')?`<button class="btn secondary smallbtn" onclick="printCargoByNumber('${n}')">🖨 Reimprimir</button>`:'';
+ const completing=status==='INCOMPLETO'?`<button class="btn smallbtn" onclick="editCargo('${n}')">✎ Completar</button>`:'';
+ const actions=`<div class="ams-v83-inline-actions">${view}${printing}${completing}${amsV83Menu('cargo',c.number)}</div>`;
+ return [n,esc(c.docType),esc(cargoCategory(c.docType)),esc(c.date),esc(c.name),
+ `<b style="color:${status==='INCOMPLETO'?'#b45b00':'#13803e'}">${esc(status)}</b>`,actions];
+})}
+const cargoHeaders=['N.º salida','Tipo','Descripción','Fecha y hora de envío','Responsable','Estado','ACCIONES'];
 
 function amsNormalizeSampleCode(x){return String(x||'').trim().toUpperCase().replace(/\s+/g,'').replace(/-(A|B)$/,'')}
 function amsFindSampleOwner(type,code){
@@ -596,8 +716,8 @@ function cargoPage(){
  : `<div class="cargo-line" style="margin:12px 0;padding:12px"><div class="row" style="align-items:end;gap:12px;flex-wrap:nowrap"><strong style="flex:0 0 72px;white-space:nowrap">ÍTEM ${i+1}</strong><div style="flex:1 1 33%;min-width:0">${select('Tipo de muestra *','cargoType'+i,['Seleccione',...cargoTypesFor(cargoType)])}</div><div style="flex:1 1 33%;min-width:0">${field('Código *','cargoCode'+i,'Código o parte del código')}</div><div style="flex:1 1 33%;min-width:0">${field('Observaciones','cargoNotes'+i)}</div><button class="btn danger smallbtn" style="flex:0 0 auto" onclick="removeCargoLine(${i})">× Quitar</button></div></div>`).join('');
  const choice=`<div class="field"><label>TIPO DE CARGO *</label><select id="cargoDocument" onchange="switchCargo(this.value)" ${editingCargoNumber?'disabled':''}><option value="">Seleccione un tipo de cargo</option>${options.map(([id,n])=>`<option value="${id}" ${cargoType===id?'selected':''}>${n}</option>`).join('')}</select></div>`;
  const number=editingCargoNumber||cargoType+'-'+String(Math.max(0,...state.cargo.filter(c=>c.docType===cargoType).map(c=>Number((c.number||'').split('-').pop())||0))+1).padStart(4,'0');
- const form=cargoType?`<div class="blocktitle">N.º DE SALIDA · ${esc(number)} ${editingCargoNumber?'· EDITANDO BORRADOR (SIN CAMBIAR N.º)':''}</div><div class="row">${cargoType==='PR'?'<p class="hint">Ingresa tipo y código de cada muestra; el proveedor se buscará en los registros locales. Para la matriz de Drive se requiere conectar una fuente autorizada.</p>':select('CONDUCTOR *','cargoDriver',cargoDrivers)}</div>${cargoType==='GE'?`<div class="row" style="margin:12px 0"><div style="flex:1">${select('TIPO DE MATERIAL *','cargoMaterialHeader',['Seleccione',...cargoGeneralTypes])}</div></div>`:''}${cargoType==='GE'?'<p class="hint"><b>Formato A4 vertical:</b> máximo 5 ítems por cargo de materiales generales. Si necesitas más, crea otro cargo consecutivo.</p>':''}<div id="cargoLines" style="display:${cargoType==='GE'&&!cargoGeneralTypes.includes(cargoMaterialType)?'none':'block'}">${rowHtml}</div><div class="row">${btn('＋ Agregar fila','addCargoLine()','secondary')}${btn('Guardar salida','saveCargo()')}${btn('Por completar','saveCargoDraft()','secondary')}${btn('Imprimir','printCargo()','secondary')}</div><p class="hint"><b>Por completar:</b> guarda todas las filas y valores actuales como INCOMPLETO; podrás retomarlo y seguir editando desde el historial, siempre con el mismo número. <b>Guardar salida:</b> exige los datos obligatorios, registra como COMPLETO y bloquea definitivamente cualquier edición. Puedes imprimir el formato aun sin guardar ni completar los datos.</p>`:`<p class="hint">Selecciona un tipo de cargo para mostrar su formulario de registro.</p>`;
- return head('1.5 CARGOS DE MUESTRAS Y MATERIALES','Salida de muestras y materiales · historial integrado.')+`<section class="panel">${choice}${form}</section>`+panel('HISTORIAL DE SALIDAS',`<div class="row">${select('Tipo de salida','cargoFilterType',['TODOS','CH','PR','GE'])}${field('N.º salida / Descripción','cargoFilterCode')}${field('Fecha','cargoFilterDate','','date')}${btn('Buscar','filterCargo()')}${btn('Limpiar filtros','setPage("1.5")','secondary')}</div><div id="cargoHistory">${table(cargoHeaders,cargoHistoryRows(state.cargo))}</div>`)
+ const form=cargoType?`<div class="blocktitle">N.º DE SALIDA · ${esc(number)} ${editingCargoNumber?'· EDITANDO BORRADOR (SIN CAMBIAR N.º)':''}</div><div class="row">${cargoType==='PR'?'<p class="hint">Ingresa tipo y código de cada muestra; el proveedor se buscará en los registros locales. Para la matriz de Drive se requiere conectar una fuente autorizada.</p>':select('CONDUCTOR *','cargoDriver',cargoDrivers)}</div>${cargoType==='GE'?`<div class="row" style="margin:12px 0"><div style="flex:1">${select('TIPO DE MATERIAL *','cargoMaterialHeader',['Seleccione',...cargoGeneralTypes])}</div></div>`:''}${cargoType==='GE'?'<p class="hint"><b>Formato A4 vertical:</b> máximo 5 ítems por cargo de materiales generales. Si necesitas más, crea otro cargo consecutivo.</p>':''}<div id="cargoLines" style="display:${cargoType==='GE'&&!cargoGeneralTypes.includes(cargoMaterialType)?'none':'block'}">${rowHtml}</div><div class="row">${btn('＋ Agregar fila','addCargoLine()','secondary')}${btn('Guardar salida','saveCargo()')}${btn('Por completar','saveCargoDraft()','secondary')}${btn('Imprimir','printCargo()','secondary')}</div><p class="hint"><b>Los cargos guardados permanecen disponibles para reimpresión desde HISTORIAL.</b> <b>Por completar:</b> guarda todas las filas y valores actuales como INCOMPLETO; podrás retomarlo y seguir editando desde el historial, siempre con el mismo número. <b>Guardar salida:</b> exige los datos obligatorios, registra como COMPLETO y bloquea definitivamente cualquier edición. Puedes imprimir el formato aun sin guardar ni completar los datos.</p>`:`<p class="hint">Selecciona un tipo de cargo para mostrar su formulario de registro.</p>`;
+ return head('1.5 CARGOS DE MUESTRAS Y MATERIALES','Salida de muestras y materiales · historial integrado.')+`<section class="panel">${choice}${form}</section>`+panel('HISTORIAL DE SALIDAS · REIMPRESIÓN DISPONIBLE',`<p class=\"hint\">Los cargos guardados se conservan en el historial para imprimirlos nuevamente sin crear un cargo duplicado.</p><div class="row">${select('Tipo de salida','cargoFilterType',['TODOS','CH','PR','GE'])}${field('N.º salida / Descripción','cargoFilterCode')}${field('Fecha','cargoFilterDate','','date')}${btn('Buscar','filterCargo()')}${btn('Limpiar filtros','setPage("1.5")','secondary')}</div><div id="cargoHistory">${table(cargoHeaders,cargoHistoryRows(state.cargo))}</div>`)
 }
 document.addEventListener('change',e=>{if(e.target.id==='cargoMaterialHeader'&&cargoType==='GE'){cargoMaterialType=e.target.value;const box=document.getElementById('cargoLines');if(box)box.style.display=cargoGeneralTypes.includes(cargoMaterialType)?'block':'none';}});
 function toggleCargoExtra(i){const t=val('cargoType'+i),el=document.getElementById('cargoExtra'+i);if(el)el.style.display=cargoGeneralTypes.includes(t)?'grid':'none';cargoLines[i].type=t}
@@ -775,6 +895,21 @@ function amsV82Eligible(entity,item){
  }
  return false;
 }
+function amsV83Menu(entity,id){
+ if(!amsV82Eligible(entity,amsV82Obj(entity,id)))return '';
+ const disabled=amsV82Obj(entity,id)?.status==='ANULADO';
+ if(disabled)return '';
+ const n=esc(String(id));
+ return `<select class="ams-v83-action-select" aria-label="Acciones sobre registro ${n}" onchange="amsV83Elegir('${entity}','${n}',this)">
+  <option value="">⋯ Acciones</option><option value="EDITAR">✏ Editar</option>
+  ${isAdminAMS()?'<option value="ANULAR">🚫 Anular</option><option value="ELIMINAR">🗑 Eliminar</option>':''}
+ </select>`;
+}
+function amsV83Elegir(entity,id,select){
+ const action=select.value;select.value='';
+ if(action==='EDITAR')amsV82Edit(entity,id);
+ if(action==='ANULAR'||action==='ELIMINAR')amsV82Action(entity,id,action);
+}
 function amsV82Obj(entity,id){return (entity==='people'?state.people:state.cargo).find(x=>String(entity==='people'?x.id:x.number)===String(id));}
 function amsV82Field(k,label,value,type='text'){
  const v=esc(value??'');
@@ -786,6 +921,13 @@ function amsV82Modal(title,body,handler){
  d.innerHTML=`<h3>${esc(title)}</h3><p class="hint">Modifica solo lo necesario. No se cambia el identificador del registro. Se sincronizará con Supabase y Google Sheets.</p>${body}<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px"><button type="button" id="amsV82Cancel" class="btn secondary">Cancelar</button><button type="button" id="amsV82Save" class="btn">Guardar corrección</button></div>`;
  document.body.appendChild(d);d.querySelector('#amsV82Cancel').onclick=()=>d.close();
  d.querySelector('#amsV82Save').onclick=()=>handler(d);
+ const dniEditor=d.querySelector('input[data-ams-key="dni"]');
+ if(dniEditor)dniEditor.addEventListener('input',()=>{
+  for(const key of ['name','phone','license','licensecat']){
+   const dep=d.querySelector('[data-ams-key="'+key+'"]');
+   if(dep)dep.value='';
+  }
+ });
  d.addEventListener('close',()=>d.remove());d.showModal();
 }
 function amsV82Edit(entity,id){
