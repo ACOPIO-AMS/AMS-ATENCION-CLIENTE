@@ -262,6 +262,22 @@ dialog{border:0;border-radius:14px;padding:24px;max-width:440px;width:calc(100% 
  .ams-v83-action-select{width:123px}.ams-v83-inline-actions .smallbtn{padding:6px 7px;font-size:11px}
 }
 </style>
+<style>
+/* AMS V8.4: agrupación por ingreso, sin tabla horizontal en celulares. */
+.ams-v84-mobile{display:none}
+.ams-v84-grupo{background:#fff;border:1px solid #d4e2ef;border-radius:12px;overflow:hidden;margin:12px 0;box-shadow:0 2px 8px #1339580d}
+.ams-v84-grupo>header{background:#123d63;color:white;font-size:15px;font-weight:700;padding:12px 13px}
+.ams-v84-grupo>header small{display:block;color:#d5e4f3;font-weight:500;font-size:11px;margin-top:4px}
+.ams-v84-persona{padding:12px 13px;border-top:1px solid #e1e9f3}
+.ams-v84-persona:nth-of-type(even){background:#f4f8fd}
+.ams-v84-linea{display:flex;gap:6px;flex-wrap:wrap;font-size:13px;overflow-wrap:anywhere}
+.ams-v84-linea strong{color:#134e7c}.ams-v84-linea-menor{font-size:12px;color:#415970;margin-top:5px;overflow-wrap:anywhere}
+.ams-v84-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.ams-v84-acciones button{background:#dceefe;color:#06599c;border:0;border-radius:7px;padding:7px 12px}
+.ams-v84-sin-conductor{font-size:12px;padding:10px 13px;color:#a25815;background:#fff2db}
+.ams-v84-lookup-status{display:block;font-size:11px;color:#33597b;min-height:15px;margin-top:3px}
+@media(max-width:700px){.ams-v84-mobile{display:block}.ams-v84-desktop{display:none!important}}
+</style>
 </head><body>
 <header><div><h1>AMS ACOPIO</h1><small>Analytica Mineral Services SAC · Gestión de operaciones</small></div><span class="tag">MODO LOCAL · CONFIGURA SUPABASE</span></header>
 <div class="layout"><aside id="sidebar"></aside><main id="app"></main></div><nav id="mobileNav" aria-label="Navegación de Atención al Cliente"></nav>
@@ -546,31 +562,58 @@ function getHistoryGroups(){
  for(const p of state.people){const key=String(p.eventId||('legacy-'+p.id));if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p)}
  return [...groups.entries()].map(([id,people])=>({id,people,first:people[0],incomplete:people.some(p=>p.type==='Proveedor por regularizar'||p.type==='Vehículo por regularizar'||p.pending===true)})).sort((a,b)=>Number(b.first.eventId||b.first.id)-Number(a.first.eventId||a.first.id));
 }
+function amsV84EsConductor_(p){return /^(conductor|vehículo por regularizar)$/i.test(String(p.type||'').trim());}
+function amsV84Acciones_(p,groupId){
+ const pending=p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type);
+ const annulled=p.status==='ANULADO';
+ const action=pending?`startRegularize('${groupId}')`:`detailPerson(${p.id})`;
+ return `<button type="button" onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button>${!annulled?amsV83Menu('people',p.id):''}`;
+}
+function amsV84ResumenMovil_(grupos){
+ if(!grupos.length)return '<p class="muted">No se encontraron ingresos para los filtros seleccionados.</p>';
+ return grupos.map(g=>{
+  const conductor=g.people.find(amsV84EsConductor_);
+  const otros=g.people.filter(p=>p!==conductor);
+  let numeroProveedor=0;
+  const etiquetas=otros.map(p=>({p,label:/^proveedor/i.test(String(p.type||''))?'PROVEEDOR '+(++numeroProveedor):String(p.type||'PERSONA').toLocaleUpperCase('es-PE')}));
+  const placa=String(g.people.find(x=>x.plate)?.plate||g.first.plate||'SIN PLACA').toLocaleUpperCase('es-PE');
+  const fila=(p,label)=>`<div class="ams-v84-persona">
+    <div class="ams-v84-linea"><strong>${esc(label)}</strong> <span>${esc(p.name||'PENDIENTE')}</span></div>
+    <div class="ams-v84-linea-menor">DNI: ${esc(p.dni||'—')}${amsV84EsConductor_(p)?` · LICENCIA: <b>${esc(p.license||'—')}</b>${p.licensecat?' · '+esc(p.licensecat):''}`:''}</div>
+    <div class="ams-v84-acciones">${amsV84Acciones_(p,g.id)}</div>
+  </div>`;
+  return `<article class="ams-v84-grupo">
+    <header>🚚 PLACA: ${esc(placa)} <small>${g.people.length} persona(s) · ${esc(g.first.entry||'')}</small></header>
+    ${conductor?fila(conductor,'CONDUCTOR'):'<div class="ams-v84-sin-conductor">CONDUCTOR: NO REGISTRADO</div>'}
+    ${etiquetas.map(({p,label})=>fila(p,label)).join('')}
+  </article>`;
+ }).join('');
+}
 function historyPage(){
  const today=amsToday();
  const groups=getHistoryGroups().map(g=>({...g,people:g.people.filter(p=>((amsPresentOn(p,today)&&!p.exit)||(p.status==='ANULADO'&&amsISO(p.entry)===today)))})).filter(g=>g.people.length);
  const f=historyFilters;
  const filtered=groups.filter(g=>{
-  const text=g.people.map(p=>[p.name,p.dni,p.plate,p.motive,p.phone].join(' ')).join(' ').toLowerCase();
+  const text=g.people.map(p=>[p.name,p.dni,p.plate,p.motive,p.phone,p.license].join(' ')).join(' ').toLowerCase();
   const day=amsISO(g.first.entry);
   const pending=g.people.some(p=>p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type));
   return (!f.q||text.includes(f.q.toLowerCase()))&&(!f.from||day>=f.from)&&(!f.to||day<=f.to)&&
    (f.motive==='Todos'||g.first.motive===f.motive)&&
    (f.status==='Todos'||(g.people.some(p=>p.status==='ANULADO')?'Anulado':pending?'Por regularizar':'Completo')===f.status);
  });
- let out=head('1.2 HISTORIAL','Todas las personas presentes se muestran directamente. Se identifican por placa y cantidad en el mismo vehículo.');
+ let out=head('1.2 HISTORIAL','En celular, un resumen por ingreso agrupa la placa, el conductor y los proveedores.');
  out+=`<section class="panel" style="padding:10px;margin:10px 0"><div class="h12-filter">
- ${field('Buscar','hsearch','DNI, nombre o placa...')}${field('Fecha desde','hfrom','','date')}${field('Fecha hasta','hto','','date')}${select('Motivo de ingreso','hmotive',['Todos',...motives])}${select('Estado','hstatus',['Todos','Completo','Por regularizar','Anulado'])}
+ ${field('Buscar','hsearch','DNI, nombre, placa o licencia...')}${field('Fecha desde','hfrom','','date')}${field('Fecha hasta','hto','','date')}${select('Motivo de ingreso','hmotive',['Todos',...motives])}${select('Estado','hstatus',['Todos','Completo','Por regularizar','Anulado'])}
  ${btn('Buscar','applyHistoryFilters()')}${btn('Limpiar','clearHistoryFilters()','secondary')}</div></section>`;
  out+=`<div class="h12-info">Vehículos / ingresos: <b>${filtered.length}</b> · Personas visibles: <b>${filtered.reduce((n,g)=>n+g.people.length,0)}</b></div>`;
- out+=`<section class="panel scroll h12-compact-wrap" style="padding:0"><table class="h12-table h12-compact"><thead><tr>${['FECHA Y HORA','PLACA / PERSONAS','TIPO','NOMBRES Y APELLIDOS','MOTIVO','ZONA','LOTES / DETALLE','ESTADO','ACCIÓN'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
- if(!filtered.length)out+='<tr><td colspan="9" class="h12-empty">No hay personas presentes que coincidan con los filtros.</td></tr>';
+ out+=`<div class="ams-v84-mobile">${amsV84ResumenMovil_(filtered)}</div>`;
+ out+=`<section class="panel scroll h12-compact-wrap ams-v84-desktop" style="padding:0"><table class="h12-table h12-compact"><thead><tr>${['FECHA Y HORA','PLACA / PERSONAS','TIPO','NOMBRES Y APELLIDOS','DNI','LICENCIA CONDUCTOR','MOTIVO','ZONA','LOTES / DETALLE','ESTADO','ACCIÓN'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
+ if(!filtered.length)out+='<tr><td colspan="11" class="h12-empty">No hay personas presentes que coincidan con los filtros.</td></tr>';
  filtered.forEach(g=>g.people.forEach((p,i)=>{
   const pending=p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type);
   const annulled=p.status==='ANULADO';
-  const action=pending?`startRegularize('${g.id}')`:`detailPerson(${p.id})`;
   const detail=[p.lots?'Lotes: '+p.lots:'',p.lotCode||p.load||''].filter(Boolean).join(' · ')||'—';
-  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending||annulled?'bad':''}">${annulled?'ANULADO':pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions"><button onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button>${!annulled?amsV83Menu('people',p.id):''}</td></tr>`;
+  out+=`<tr class="h12-person-row"><td>${esc(p.entry)}</td><td><b>${esc(p.plate||g.first.plate||'—')}</b>${i===0&&g.people.length>1?`<small class="h12-badge">${g.people.length} personas</small>`:''}</td><td>${esc(p.type)}</td><td class="h12-name">${esc(p.name)}</td><td>${esc(p.dni||'—')}</td><td>${amsV84EsConductor_(p)?esc(p.license||'—'):'—'}</td><td>${esc(p.motive||g.first.motive||'—')}</td><td>${esc(p.zone||g.first.zone||'—')}</td><td>${esc(detail)}</td><td><span class="h12-status ${pending||annulled?'bad':''}">${annulled?'ANULADO':pending?'POR REGULARIZAR':'COMPLETO'}</span></td><td class="h12-actions">${amsV84Acciones_(p,g.id)}</td></tr>`;
  }));
  out+='</tbody></table></section>';
  setTimeout(()=>{for(const [id,v] of Object.entries({hsearch:historyFilters.q,hfrom:historyFilters.from,hto:historyFilters.to,hmotive:historyFilters.motive,hstatus:historyFilters.status})){const el=document.getElementById(id);if(el)el.value=v}},0);
@@ -707,16 +750,71 @@ function amsFillCargoOwner(i){if(cargoType!=='PR')return;const t=val('cargoType'
 document.addEventListener('change',e=>{const m=e.target.id.match(/^cargo(Type|Code)(\d+)$/);if(m)amsFillCargoOwner(Number(m[2]))});
 document.addEventListener('blur',e=>{const m=e.target.id.match(/^cargoCode(\d+)$/);if(m)amsFillCargoOwner(Number(m[1]))},true);
 
+// AMS V8.4: consulta autenticada al índice de PROCESOS - GUIAS (A=código, I=proveedor).
+// No se exponen claves de importación ni URLs privadas de Apps Script al navegador.
+const amsV84CacheLotes_=new Map();
+const amsV84Solicitudes_=new Map();
+async function amsV84ConsultarLote_(codigo){
+  const cached=amsV84CacheLotes_.get(codigo);
+  if(cached&&Date.now()-cached.ts<60000)return cached.data;
+  const api=String(window.AMS_CONFIG?.catalogUrl||'');
+  const token=window.AMSCloud?.token;
+  if(!token||!/^https:\/\/[a-z0-9-]+\.supabase\.co\/functions\/v1\/ams-consultas\/?$/.test(api))throw Error('NO_HAY_SESION_DE_CONSULTA');
+  const response=await fetch(api,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify({tipo:'lote',valor:codigo}),cache:'no-store'});
+  const result=await response.json();
+  if(!response.ok||!result.ok)throw Error(result.error||'ERROR_BUSCANDO_LOTE');
+  const data=result.result||null;
+  amsV84CacheLotes_.set(codigo,{data,ts:Date.now()});
+  return data;
+}
+async function amsV84AutocompletarLote_(i,origen){
+  if(cargoType!=='PR')return;
+  const codeEl=document.getElementById('cargoCode'+i),nameEl=document.getElementById('cargoProviderLine'+i),msg=document.getElementById('amsLoteEstado'+i);
+  if(!codeEl||!nameEl)return;
+  const raw=origen==='nombre'?nameEl.value.trim():codeEl.value.trim();
+  const codigo=raw.replace(/\s/g,'');
+  if(!/^\d{5}$/.test(codigo))return;
+  const seq=(amsV84Solicitudes_.get(i)||0)+1;amsV84Solicitudes_.set(i,seq);
+  if(msg)msg.textContent='Consultando lote '+codigo+'…';
+  try{
+    const result=await amsV84ConsultarLote_(codigo);
+    if(amsV84Solicitudes_.get(i)!==seq||!nameEl.isConnected)return;
+    if((origen==='nombre'?nameEl.value:codeEl.value).trim().replace(/\s/g,'')!==codigo)return;
+    if(result?.ambiguo){if(msg)msg.textContent='Lote con proveedores distintos en la matriz. Verificar manualmente.';return;}
+    if(!result?.proveedor){if(msg)msg.textContent='Lote no encontrado en PROCESOS - GUIAS. Ingresa el nombre manualmente.';return;}
+    if(origen==='nombre'||!nameEl.value.trim()||nameEl.dataset.autofilled==='1'){
+      nameEl.value=String(result.proveedor).toLocaleUpperCase('es-PE');
+      nameEl.dataset.autofilled='1';
+      nameEl.dataset.loteOrigen=codigo;
+      if(msg)msg.textContent='✓ Proveedor encontrado en PROCESOS - GUIAS';
+    }else if(msg){msg.textContent='Proveedor encontrado: '+result.proveedor+'. Se conservó el nombre ingresado manualmente.';}
+  }catch(err){if(msg&&nameEl.isConnected)msg.textContent='Consulta no disponible: '+(err.message||err)+'. Puedes ingresar el nombre manualmente.';}
+}
+const amsV84TiemposLote_=new Map();
+document.addEventListener('input',e=>{
+  const m=/^cargo(Code|ProviderLine)(\d+)$/.exec(e.target.id||'');if(!m||cargoType!=='PR')return;
+  const i=Number(m[2]);
+  if(m[1]==='ProviderLine')e.target.dataset.autofilled='0';
+  clearTimeout(amsV84TiemposLote_.get(e.target.id));
+  if(/^\d{5}$/.test(String(e.target.value||'').trim()))amsV84TiemposLote_.set(e.target.id,setTimeout(()=>amsV84AutocompletarLote_(i,m[1]==='Code'?'codigo':'nombre'),300));
+});
+document.addEventListener('change',e=>{
+ const m=/^cargo(Code|ProviderLine)(\d+)$/.exec(e.target.id||'');
+ if(m)amsV84AutocompletarLote_(Number(m[2]),m[1]==='Code'?'codigo':'nombre');
+});
+
+
 function cargoPage(){
  const options=[['CH','Muestras para Oficina Chala (CH)'],['PR','Muestras para el proveedor (PR)'],['GE','Materiales en general (GE)']];
  const rowHtml=cargoLines.map((l,i)=>cargoType==='GE'
  ? `<div class="cargo-line" style="display:block;margin:12px 0;padding:12px"><div class="row" style="align-items:end;justify-content:space-between"><strong>ÍTEM ${i+1}</strong><button class="btn danger smallbtn" onclick="removeCargoLine(${i})">× Quitar</button></div><div class="row" style="gap:10px;margin-top:12px">${field('Descripción *','cargoDescription'+i,'Descripción del producto')}${field('Motivo de salida *','cargoReason'+i,'Motivo de salida')}${field('Cantidad *','cargoQuantity'+i,'Cantidad','number')}${field('Unidad de medida *','cargoUnit'+i,'Unidad de medida')}${field('Observaciones','cargoNotes'+i)}</div></div>`
  : cargoType==='PR'
- ? `<div class="cargo-line cargo-line-pr" style="margin:12px 0;padding:12px"><div class="cargo-provider-fields"><strong class="cargo-item-label">ÍTEM ${i+1}</strong><div class="cargo-sample-type">${select('Tipo de muestra *','cargoType'+i,['Seleccione',...cargoTypesFor(cargoType)])}</div><div class="cargo-sample-code">${field('Código *','cargoCode'+i,'Código o parte del código')}</div><div class="cargo-provider-name">${field('Nombres y apellidos del proveedor *','cargoProviderLine'+i,'Autocompletar o ingresar')}</div><button class="btn danger smallbtn cargo-remove-button" style="flex:0 0 auto" onclick="removeCargoLine(${i})">× Quitar</button></div></div>`
+ ? `<div class="cargo-line cargo-line-pr" style="margin:12px 0;padding:12px"><div class="cargo-provider-fields"><strong class="cargo-item-label">ÍTEM ${i+1}</strong><div class="cargo-sample-type">${select('Tipo de muestra *','cargoType'+i,['Seleccione',...cargoTypesFor(cargoType)])}</div><div class="cargo-sample-code">${field('Código *','cargoCode'+i,'Código o parte del código')}</div><div class="cargo-provider-name">${field('Nombres y apellidos del proveedor *','cargoProviderLine'+i,'Escriba lote (5 dígitos) o nombre')}<small id="amsLoteEstado${i}" class="ams-v84-lookup-status" aria-live="polite"></small></div><button class="btn danger smallbtn cargo-remove-button" style="flex:0 0 auto" onclick="removeCargoLine(${i})">× Quitar</button></div></div>`
  : `<div class="cargo-line" style="margin:12px 0;padding:12px"><div class="row" style="align-items:end;gap:12px;flex-wrap:nowrap"><strong style="flex:0 0 72px;white-space:nowrap">ÍTEM ${i+1}</strong><div style="flex:1 1 33%;min-width:0">${select('Tipo de muestra *','cargoType'+i,['Seleccione',...cargoTypesFor(cargoType)])}</div><div style="flex:1 1 33%;min-width:0">${field('Código *','cargoCode'+i,'Código o parte del código')}</div><div style="flex:1 1 33%;min-width:0">${field('Observaciones','cargoNotes'+i)}</div><button class="btn danger smallbtn" style="flex:0 0 auto" onclick="removeCargoLine(${i})">× Quitar</button></div></div>`).join('');
  const choice=`<div class="field"><label>TIPO DE CARGO *</label><select id="cargoDocument" onchange="switchCargo(this.value)" ${editingCargoNumber?'disabled':''}><option value="">Seleccione un tipo de cargo</option>${options.map(([id,n])=>`<option value="${id}" ${cargoType===id?'selected':''}>${n}</option>`).join('')}</select></div>`;
  const number=editingCargoNumber||cargoType+'-'+String(Math.max(0,...state.cargo.filter(c=>c.docType===cargoType).map(c=>Number((c.number||'').split('-').pop())||0))+1).padStart(4,'0');
- const form=cargoType?`<div class="blocktitle">N.º DE SALIDA · ${esc(number)} ${editingCargoNumber?'· EDITANDO BORRADOR (SIN CAMBIAR N.º)':''}</div><div class="row">${cargoType==='PR'?'<p class="hint">Ingresa tipo y código de cada muestra; el proveedor se buscará en los registros locales. Para la matriz de Drive se requiere conectar una fuente autorizada.</p>':select('CONDUCTOR *','cargoDriver',cargoDrivers)}</div>${cargoType==='GE'?`<div class="row" style="margin:12px 0"><div style="flex:1">${select('TIPO DE MATERIAL *','cargoMaterialHeader',['Seleccione',...cargoGeneralTypes])}</div></div>`:''}${cargoType==='GE'?'<p class="hint"><b>Formato A4 vertical:</b> máximo 5 ítems por cargo de materiales generales. Si necesitas más, crea otro cargo consecutivo.</p>':''}<div id="cargoLines" style="display:${cargoType==='GE'&&!cargoGeneralTypes.includes(cargoMaterialType)?'none':'block'}">${rowHtml}</div><div class="row">${btn('＋ Agregar fila','addCargoLine()','secondary')}${btn('Guardar salida','saveCargo()')}${btn('Por completar','saveCargoDraft()','secondary')}${btn('Imprimir','printCargo()','secondary')}</div><p class="hint"><b>Los cargos guardados permanecen disponibles para reimpresión desde HISTORIAL.</b> <b>Por completar:</b> guarda todas las filas y valores actuales como INCOMPLETO; podrás retomarlo y seguir editando desde el historial, siempre con el mismo número. <b>Guardar salida:</b> exige los datos obligatorios, registra como COMPLETO y bloquea definitivamente cualquier edición. Puedes imprimir el formato aun sin guardar ni completar los datos.</p>`:`<p class="hint">Selecciona un tipo de cargo para mostrar su formulario de registro.</p>`;
+ const form=cargoType?`<div class="blocktitle">N.º DE SALIDA · ${esc(number)} ${editingCargoNumber?'· EDITANDO BORRADOR (SIN CAMBIAR N.º)':''}</div><div class="row">${cargoType==='PR'?'<p class="hint">Ingresa tipo y código de cada muestra; el proveedor se consulta mediante el código de lote (5 dígitos) en PROCESOS - GUIAS, columnas A e I. También puede escribir el lote en el campo de proveedor.</p>':select('CONDUCTOR *','cargoDriver',cargoDrivers)}</div>${cargoType==='GE'?`<div class="row" style="margin:12px 0"><div style="flex:1">${select('TIPO DE MATERIAL *','cargoMaterialHeader',['Seleccione',...cargoGeneralTypes])}</div></div>`:''}${cargoType==='GE'?'<p class="hint"><b>Formato A4 vertical:</b> máximo 5 ítems por cargo de materiales generales. Si necesitas más, crea otro cargo consecutivo.</p>':''}<div id="cargoLines" style="display:${cargoType==='GE'&&!cargoGeneralTypes.includes(cargoMaterialType)?'none':'block'}">${rowHtml}</div><div class="row">${btn('＋ Agregar fila','addCargoLine()','secondary')}${btn('Guardar salida','saveCargo()')}${btn('Por completar','saveCargoDraft()','secondary')}${btn('Imprimir','printCargo()','secondary')}</div><p class="hint"><b>Los cargos guardados permanecen disponibles para reimpresión desde HISTORIAL.</b> <b>Por completar:</b> guarda todas las filas y valores actuales como INCOMPLETO; podrás retomarlo y seguir editando desde el historial, siempre con el mismo número. <b>Guardar salida:</b> exige los datos obligatorios, registra como COMPLETO y bloquea definitivamente cualquier edición. Puedes imprimir el formato aun sin guardar ni completar los datos.</p>`:`<p class="hint">Selecciona un tipo de cargo para mostrar su formulario de registro.</p>`;
  return head('1.5 CARGOS DE MUESTRAS Y MATERIALES','Salida de muestras y materiales · historial integrado.')+`<section class="panel">${choice}${form}</section>`+panel('HISTORIAL DE SALIDAS · REIMPRESIÓN DISPONIBLE',`<p class=\"hint\">Los cargos guardados se conservan en el historial para imprimirlos nuevamente sin crear un cargo duplicado.</p><div class="row">${select('Tipo de salida','cargoFilterType',['TODOS','CH','PR','GE'])}${field('N.º salida / Descripción','cargoFilterCode')}${field('Fecha','cargoFilterDate','','date')}${btn('Buscar','filterCargo()')}${btn('Limpiar filtros','setPage("1.5")','secondary')}</div><div id="cargoHistory">${table(cargoHeaders,cargoHistoryRows(state.cargo))}</div>`)
 }
 document.addEventListener('change',e=>{if(e.target.id==='cargoMaterialHeader'&&cargoType==='GE'){cargoMaterialType=e.target.value;const box=document.getElementById('cargoLines');if(box)box.style.display=cargoGeneralTypes.includes(cargoMaterialType)?'block':'none';}});
