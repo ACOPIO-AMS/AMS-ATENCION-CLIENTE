@@ -278,6 +278,66 @@ dialog{border:0;border-radius:14px;padding:24px;max-width:440px;width:calc(100% 
 .ams-v84-lookup-status{display:block;font-size:11px;color:#33597b;min-height:15px;margin-top:3px}
 @media(max-width:700px){.ams-v84-mobile{display:block}.ams-v84-desktop{display:none!important}}
 </style>
+<!-- AMS V8.4.1 HISTORIAL RESPONSIVO: solo CSS, sin alterar funciones ni sincronización -->
+<style>
+/* Evita que una tabla ancha desplace toda la aplicación fuera de la pantalla. */
+.layout{grid-template-columns:285px minmax(0,1fr)}
+main#app{min-width:0;max-width:100%;overflow-x:clip}
+.h12-compact-wrap{box-sizing:border-box;max-width:100%;min-width:0;overflow-x:auto!important;overscroll-behavior-x:contain}
+/* Las once columnas tienen medidas explícitas: nunca comparten el mismo espacio. */
+.h12-table.h12-compact{width:1480px!important;min-width:1480px!important;table-layout:fixed!important}
+.h12-table.h12-compact th:nth-child(1){width:130px}
+.h12-table.h12-compact th:nth-child(2){width:115px}
+.h12-table.h12-compact th:nth-child(3){width:115px}
+.h12-table.h12-compact th:nth-child(4){width:210px}
+.h12-table.h12-compact th:nth-child(5){width:100px}
+.h12-table.h12-compact th:nth-child(6){width:115px}
+.h12-table.h12-compact th:nth-child(7){width:130px}
+.h12-table.h12-compact th:nth-child(8){width:90px}
+.h12-table.h12-compact th:nth-child(9){width:135px}
+.h12-table.h12-compact th:nth-child(10){width:115px}
+.h12-table.h12-compact th:nth-child(11){width:225px}
+.h12-table.h12-compact td{white-space:normal;overflow-wrap:break-word;vertical-align:middle}
+.h12-table.h12-compact .h12-actions{min-width:0!important;white-space:normal!important}
+.h12-table.h12-compact .h12-status{display:inline-block;white-space:normal}
+/* Cabecera de cada resumen agrupado: los datos no se mezclan con el encabezado global. */
+.ams-v84-grupo>header{display:block;position:static;max-width:none;min-width:0;line-height:1.4}
+.ams-v84-grupo{min-width:0;max-width:100%;margin:0;align-self:start}
+.ams-v84-persona{min-width:0}
+.ams-v84-linea,.ams-v84-linea-menor{word-break:normal;overflow-wrap:anywhere}
+.ams-v84-acciones{min-width:0;align-items:center}
+.ams-v84-acciones .ams-v83-action-select{width:min(150px,100%);max-width:100%;min-width:0}
+/* En PC de resolución habitual y tablet, usar tarjetas agrupadas en vez de
+   reducir once columnas hasta volverlas ilegibles. */
+@media (max-width:1699px){
+  .ams-v84-desktop{display:none!important}
+  .ams-v84-mobile{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,390px),1fr));gap:14px;align-items:start;min-width:0;max-width:100%}
+}
+@media (max-width:1050px){
+  .layout{grid-template-columns:clamp(125px,17vw,190px) minmax(0,1fr)}
+}
+@media (max-width:700px){
+  .layout{grid-template-columns:78px minmax(0,1fr)!important}
+  .ams-v84-mobile{grid-template-columns:minmax(0,1fr)!important;gap:12px}
+  .ams-v84-persona{padding:10px 11px}
+  .ams-v84-grupo>header{padding:11px}
+}
+/* Pantallas muy anchas: tabla ordenada y, si hace falta, scroll dentro del panel. */
+@media (min-width:1700px){
+  .ams-v84-mobile{display:none!important}
+  .ams-v84-desktop{display:block!important}
+}
+</style>
+<!-- AMS V8.5: detalle de lotes visible y sin botón "Ver" en historial -->
+<style>
+.ams-v85-lotes{display:grid;gap:5px;margin-top:10px;padding:9px 11px;border-radius:8px;background:#eaf4fc;border-left:3px solid #277ab5;color:#173c5b;min-width:0}
+.ams-v85-lote{display:flex;flex-wrap:wrap;gap:4px 7px;align-items:baseline;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.ams-v85-lote strong{font-size:11px;letter-spacing:.015em;color:#0d4778}
+.ams-v85-lote span{font-weight:550;overflow-wrap:anywhere;white-space:pre-wrap}
+.ams-v84-acciones{margin-top:10px}
+.ams-v84-acciones>.ams-v83-action-select{width:auto;min-width:135px;max-width:100%;font-size:13px}
+@media (max-width:700px){.ams-v85-lotes{padding:9px 10px}.ams-v84-acciones>.ams-v83-action-select{width:100%}}
+</style>
 </head><body>
 <header><div><h1>AMS ACOPIO</h1><small>Analytica Mineral Services SAC · Gestión de operaciones</small></div><span class="tag">MODO LOCAL · CONFIGURA SUPABASE</span></header>
 <div class="layout"><aside id="sidebar"></aside><main id="app"></main></div><nav id="mobileNav" aria-label="Navegación de Atención al Cliente"></nav>
@@ -566,8 +626,22 @@ function amsV84EsConductor_(p){return /^(conductor|vehículo por regularizar)$/i
 function amsV84Acciones_(p,groupId){
  const pending=p.pending||['Proveedor por regularizar','Vehículo por regularizar'].includes(p.type);
  const annulled=p.status==='ANULADO';
- const action=pending?`startRegularize('${groupId}')`:`detailPerson(${p.id})`;
- return `<button type="button" onclick="${action}">${pending?'✎ Completar':'⌕ Ver'}</button>${!annulled?amsV83Menu('people',p.id):''}`;
+ // El botón "Ver" del historial se elimina; se mantiene "Completar" cuando corresponda
+ // y el menú de acciones existente (Editar, Anular, Eliminar según permisos).
+ const completar=pending&&!annulled?`<button type="button" onclick="startRegularize('${groupId}')">✎ Completar</button>`:'';
+ return `${completar}${!annulled?amsV83Menu('people',p.id):''}`;
+}
+function amsV85DetalleLotes_(p){
+ // Se usan exclusivamente los campos ya almacenados en el registro; nunca se inventan valores.
+ const bloques=[];
+ const n=String(p.lots??'').trim();
+ const codigo=String(p.lotCode??'').trim();
+ const carga=String(p.load??'').trim();
+ if(n)bloques.push(['N.º DE LOTES',n]);
+ if(codigo)bloques.push(['CÓDIGO DE LOTE',codigo]);
+ if(carga)bloques.push([p.motive==='Retiro de lote'?'CÓDIGO / DETALLE DEL LOTE':'DETALLE DE LOTES',carga]);
+ if(!bloques.length)return '';
+ return `<div class="ams-v85-lotes">${bloques.map(([etiqueta,valor])=>`<div class="ams-v85-lote"><strong>${esc(etiqueta)}:</strong> <span>${esc(valor)}</span></div>`).join('')}</div>`;
 }
 function amsV84ResumenMovil_(grupos){
  if(!grupos.length)return '<p class="muted">No se encontraron ingresos para los filtros seleccionados.</p>';
@@ -580,6 +654,7 @@ function amsV84ResumenMovil_(grupos){
   const fila=(p,label)=>`<div class="ams-v84-persona">
     <div class="ams-v84-linea"><strong>${esc(label)}</strong> <span>${esc(p.name||'PENDIENTE')}</span></div>
     <div class="ams-v84-linea-menor">DNI: ${esc(p.dni||'—')}${amsV84EsConductor_(p)?` · LICENCIA: <b>${esc(p.license||'—')}</b>${p.licensecat?' · '+esc(p.licensecat):''}`:''}</div>
+    ${amsV85DetalleLotes_(p)}
     <div class="ams-v84-acciones">${amsV84Acciones_(p,g.id)}</div>
   </div>`;
   return `<article class="ams-v84-grupo">
