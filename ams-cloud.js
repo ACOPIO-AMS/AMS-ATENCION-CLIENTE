@@ -96,9 +96,11 @@
      window.updateLoginRoleAMS=function(){
        old();const admin=val('amsLoginName')==='ADMINISTRADOR';
        input.hidden=true;
-       for(const id of ['amsLoginGuardWrap','amsLoginShiftWrap'])document.getElementById(id).hidden=true;
-       document.getElementById('amsLoginGuard').required=false;
-       document.getElementById('amsLoginShift').required=false;
+       // La V7.2 ocultaba Guardia y Turno: dejaba O y P vacías en Drive.
+       // La asignación de guardia NO se puede deducir de la hora.
+       for(const id of ['amsLoginGuardWrap','amsLoginShiftWrap'])document.getElementById(id).hidden=false;
+       document.getElementById('amsLoginGuard').required=true;
+       document.getElementById('amsLoginShift').required=true;
        passwordWrap.hidden=admin;
        const pw=document.getElementById('amsOperatorPassword');pw.required=!admin;
        if(admin)pw.value='';
@@ -107,6 +109,9 @@
        if(caption)caption.textContent=admin?'INGRESO ADMINISTRADOR · PIN DE SUPABASE':'INGRESO · USUARIO Y CONTRASEÑA';
      };
      updateLoginRoleAMS();
+     // El HTML instaló un listener anterior que ocultaba campos.
+     // El nuevo listener corre DESPUÉS, y los vuelve a mostrar.
+     document.getElementById('amsLoginName').addEventListener('change',()=>window.updateLoginRoleAMS());
      this.refreshOperators();
    },
    lookupCatalog:async function(kind,identifier){
@@ -155,6 +160,11 @@
      if(!this.ready){document.getElementById('amsLoginError').textContent='La base todavía no está preparada.';return}
      const name=val('amsLoginName'),guard=val('amsLoginGuard'),shift=val('amsLoginShift'),pin=val('amsLoginPin');
      const err=document.getElementById('amsLoginError');err.textContent='';
+     // Validación de ingreso de sesión, NO filtrado en Apps Script.
+     if(!['A','B','C'].includes(guard)||!['Día','Noche'].includes(shift)){
+       err.textContent='Selecciona Guardia y Turno para registrar O y P en Drive.';
+       return;
+     }
      try{
        let token,role;
        if(name==='ADMINISTRADOR'){
@@ -171,7 +181,7 @@
          role='operator';
        }
        this.token=token;this.role=role;
-       sessionStorage.setItem(AMS_SESSION_KEY,JSON.stringify({name,guard:role==='admin'?'':guard,shift:role==='admin'?'':shift,role,cloud:true,started:new Date().toISOString()}));
+       sessionStorage.setItem(AMS_SESSION_KEY,JSON.stringify({name,guard,shift,role,cloud:true,started:new Date().toISOString()}));
        document.getElementById('amsLogin').hidden=true;document.getElementById('amsLoginPin').value='';
        updateSessionHeader();render();this.start();this.status='Sesión iniciada';this.draw();
      }catch(e){err.textContent=e.message||String(e)}
