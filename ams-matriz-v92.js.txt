@@ -1,0 +1,78 @@
+/* AMS ACOPIO V9.2 — Auditoría en la misma persona. NO cambia Supabase ni ams-cloud.js.
+ * Cargar ANTES de ams-cloud.js, después del script principal de index.html.
+ * Registra quien ENTREGA comida, asigna habitación, registra salidas y
+ * confirma limpieza. La sincronización existente captura los cambios en people.
+ */
+(function(){
+  'use strict';
+  if(window.__AMS_V92_AUDITORIA_ACTIVA)return;
+  if(typeof window.ask!=='function')throw Error('AMS V9.2: cargar después de la aplicación principal');
+  window.__AMS_V92_AUDITORIA_ACTIVA=true;
+  const anterior=window.ask;
+  const alimentos=['DESAYUNO','ALMUERZO','CENA'];
+  const str=x=>String(x??'');
+  function fechaMs(v){
+    const m=str(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m?Date.UTC(+m[3],+m[2]-1,+m[1]):NaN;
+  }
+  function addFood(persona,idx,operador,fecha,cantidad){
+    if(!Array.isArray(persona.amsFoodEvents))persona.amsFoodEvents=[];
+    // Todas las entregas (incluido desayuno/cena en otro turno) tienen autor propio.
+    persona.amsFoodEvents.push({label:alimentos[idx]+' x'+cantidad,by:operador,at:fecha});
+  }
+  function addStay(persona,tipo,operador,fecha){
+    if(!Array.isArray(persona.amsLodgingEvents))persona.amsLodgingEvents=[];
+    persona.amsLodgingEvents.push({label:tipo,by:operador,at:fecha});
+  }
+  window.ask=function(mensaje,accion){
+    if(typeof accion!=='function')return anterior.apply(this,arguments);
+    return anterior.call(this,mensaje,async function(){
+      const prev=new Map((state.people||[]).map(p=>[String(p.id),{
+        meals:Array.isArray(p.meals)?p.meals.slice():[],
+        room:str(p.room),lodgingEntry:str(p.lodgingEntry),
+        lodgingExit:str(p.lodgingExit),exit:str(p.exit)
+      }]));
+      const cleanings=(state.cleanings||[]).length;
+      await accion();
+      const responsable=str(currentSession()?.name).trim()||'USUARIO SIN IDENTIFICAR';
+      const fecha=now();
+      for(const p of state.people||[]){
+        const before=prev.get(String(p.id));
+        if(!before){
+          // Visitantes que ingresan con habitación asignada en el mismo formulario.
+          if(p.room&&p.lodgingEntry)addStay(p,'HABITACIÓN '+p.room+' + KIT',responsable,fecha);
+          continue;
+        }
+        for(let i=0;i<3;i++){
+          const diff=(Number(p.meals?.[i])||0)-(Number(before.meals[i])||0);
+          if(diff>0)addFood(p,i,responsable,fecha,diff);
+        }
+        if(p.room && (str(p.room)!==before.room || (p.lodgingEntry && str(p.lodgingEntry)!==before.lodgingEntry))){
+          addStay(p,'HABITACIÓN '+p.room+' + KIT',responsable,fecha);
+        }
+        if(p.lodgingExit && str(p.lodgingExit)!==before.lodgingExit){
+          addStay(p,'SALIDA ALOJAMIENTO',responsable,fecha);
+        }
+        if(p.exit && str(p.exit)!==before.exit){
+          addStay(p,'SALIDA PLANTA',responsable,fecha);
+        }
+      }
+      // Solo FIN de limpieza: asociar el personal al último grupo que salió
+      // de esa habitación (últimos 2 días). No asignar a huéspedes en curso.
+      const nuevas=(state.cleanings||[]).slice(cleanings);
+      for(const c of nuevas){
+        if(str(c.status).toUpperCase()!=='FIN')continue;
+        const fechaLimpieza=fechaMs(c.date),candidatos=(state.people||[]).filter(p=>{
+          if(str(p.room)!==str(c.room)||!p.lodgingExit)return false;
+          const ms=fechaMs(p.lodgingExit);
+          return Number.isFinite(ms)&&Number.isFinite(fechaLimpieza)&&
+            ms<=fechaLimpieza && (fechaLimpieza-ms)<=2*86400000;
+        });
+        if(!candidatos.length)continue;
+        const ultima=Math.max(...candidatos.map(p=>fechaMs(p.lodgingExit)));
+        candidatos.filter(p=>fechaMs(p.lodgingExit)===ultima)
+          .forEach(p=>{p.amsCleaner=str(c.worker).trim();});
+      }
+    });
+  };
+})();
