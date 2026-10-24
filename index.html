@@ -777,14 +777,114 @@ function amsNextDay(iso){const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()
 function amsDays(start,end){const a=new Date(start+'T12:00:00'),b=new Date(end+'T12:00:00');return Math.max(1,Math.round((b-a)/86400000)+1)}
 function amsPresentOn(p,day){if(p.status==='ANULADO'||p.amsStatus==='ANULADO')return false;const start=amsISO(p.entry||p.lodgingEntry);const end=amsISO(p.exit);return !!start&&start<=day&&(!end||end>=day)}
 function amsLodgedOn(p,day){const start=amsISO(p.lodgingEntry),end=amsISO(p.lodgingExit);return !!start&&start<=day&&(!end||end>=day)}
-function amsDailyServices(p,day){const result=[0,0,0,0,0,0];const logs=state.services.filter(x=>String(x.id)===String(p.id));if(logs.length){logs.forEach(x=>{if(amsISO(x.date)===day&&Number.isInteger(Number(x.service))&&Number(x.service)>=0&&Number(x.service)<6)result[Number(x.service)]++})}else if(amsISO(p.entry)===day){(p.meals||[]).slice(0,6).forEach((v,i)=>result[i]=Number(v)||0)}return result}
+function amsDailyServices(p,day){
+ const result=[0,0,0,0,0,0];
+ const logs=state.services.filter(x=>String(x.id)===String(p.id));
+ if(logs.length){
+   logs.forEach(x=>{const i=Number(x.service);if(amsISO(x.date)===day&&Number.isInteger(i)&&i>=0&&i<6){result[i]+=Number.isFinite(Number(x.delta))?Number(x.delta):1;}});
+   return result.map(v=>Math.max(0,v));
+ }
+ if(amsISO(p.entry)===day)(p.meals||[]).slice(0,6).forEach((v,i)=>result[i]=Number(v)||0);
+ return result;
+}
 function amsKitOn(p,day){const start=amsISO(p.lodgingEntry);return start===day?(Array.isArray(p.kit)?p.kit:[1,1,1]):[0,0,0]}
 function amsDayLabel(p,day){if(amsISO(p.exit)===day)return 'SALIDA';return amsISO(p.entry||p.lodgingEntry)===day?'INGRESO':'PERMANENCIA'}
-function amsStayRows(people){const day=amsToday();return [...people].sort((a,b)=>Number(amsISO(a.entry)===day)-Number(amsISO(b.entry)===day)||String(a.entry||'').localeCompare(String(b.entry||''))).map(p=>[`<input type="checkbox" class="personcheck" value="${p.id}">`,esc(p.plate||'—'),esc(p.zone||'—'),esc(p.name),esc(p.phone||'—'),esc(p.motive||'—'),esc(p.entry),esc(p.exit||'—'),esc(p.room&&isRoom(+p.room)?p.room:'—'),...amsDailyServices(p,day).map(String),'<span style="color:green">'+(amsISO(p.entry)===day?'INGRESO':'PERMANENCIA')+'</span>',esc(p.attendant||p.responsible||'—'),`${btn('Hab. / Editar',`assignRoom(${p.id})`,'secondary smallbtn')} ${btn('Salir',`leavePlant(${p.id})`,'danger smallbtn')}`])}
-function stayPage(){const live=state.people.filter(p=>!p.exit),today=new Date().toLocaleDateString('es-PE'),todayServices=state.services.filter(x=>x.date.includes(today));const sums=Array.from({length:6},(_,i)=>todayServices.filter(x=>x.service===i).length);const all=state.people;
-const rows=amsStayRows(live);
-return head('1.3 ESTADÍA Y SERVICIOS AL PROVEEDOR','Control de personas en planta, alimentación y refrigerios.')+`<div class="stay-cards">${[['👥 PERSONAS EN PLANTA',live.length],['🍽️ ALIMENTOS',sums.slice(0,3).reduce((a,b)=>a+b,0)],['🛏️ HABITACIONES',new Set(activeGuests().map(p=>p.room)).size]].map(([a,b])=>`<div class="card">${a}<b>${b}</b></div>`).join('')}</div>`+panel('BÚSQUEDA Y FILTROS',`<div class="row">${field('Nombre, placa o zona','stayQ')}${select('Motivo','stayMotive',['Todos',...motives,'Operario de Acopio'])}${btn('Buscar','filterStay()')}${btn('Limpiar','setPage("1.3")','secondary')}</div>`)+panel('REGISTRO MASIVO DE CONSUMOS',`<p class="hint">Selecciona personas en la tabla y los servicios a entregar (+1 por servicio y persona).</p><div class="pills">${['Desayuno','Almuerzo','Cena','Agua','Gaseosa','Galleta'].map((x,i)=>`<label class="pill"><input class="servicecheck" type="checkbox" value="${i}" style="width:auto"> ${x}</label>`).join('')}</div>${btn('Registrar seleccionados','giveServices()')}`)+panel('PERSONAS EN PLANTA',`<div id="stayTable">${table(['✓','Placa','Zona','Nombres y apellidos','Celular','Motivo de ingreso','F. ingreso','F. salida','Hab.','Des.','Alm.','Cena','Agua','Gaseosa','Galleta','Estado','Responsable','Acciones'],rows)}</div>`)+panel('REGISTRAR OPERARIOS DE ACOPIO',`<div class="row">${field('DNI *','opdni','8 dígitos')}${field('Nombres y apellidos *','opname')}${select('Autorización *','opauth',['Seleccione','Oscar Cerrón','Kenyi Carvo'])}${select('Motivo de consumo *','opreason',['Seleccione','Proveedor se retiró antes','Separó comida y no llegó','Trabajos operativos'])}</div><br>${btn('Registrar operario','addOperator()')}`)}
-function filterStay(){const q=val('stayQ').toLowerCase(),m=val('stayMotive');const rows=amsStayRows(state.people.filter(p=>!p.exit&&(m==='Todos'||p.motive===m)&&[p.name,p.plate,p.zone].some(x=>String(x||'').toLowerCase().includes(q))));document.getElementById('stayTable').innerHTML=table(['✓','Placa','Zona','Nombre','Celular','Motivo','Ingreso','Salida','Hab.','Des.','Alm.','Cena','Agua','Gaseosa','Galleta','Estado','Responsable','Acción'],rows)}
+function amsStayRows(people){
+ return [...people]
+   .sort((a,b)=>Number(amsISO(a.entry)===amsToday())-Number(amsISO(b.entry)===amsToday())||String(a.entry||'').localeCompare(String(b.entry||'')))
+   .map(p=>[
+     `<input type="checkbox" class="personcheck" value="${esc(p.id)}">`,
+     esc(p.plate||'—'),esc(p.name),esc(p.phone||'—'),esc(p.motive||'—'),esc(p.entry),esc(p.exit||'—'),
+     amsStayNumero_(p,'room',-1,p.room||0),
+     ...Array.from({length:6},(_,i)=>amsStayNumero_(p,'meal',i,Number(p.meals?.[i])||0)),
+     '<span style="color:#17653c;font-weight:600">'+(amsISO(p.entry)===amsToday()?'INGRESO':'PERMANENCIA')+'</span>',
+     esc(p.attendant||p.responsible||'—'),
+     `${btn('Hab. / Editar',`assignRoom(${Number(p.id)})`,'secondary smallbtn')} ${btn('Salir',`leavePlant(${Number(p.id)})`,'danger smallbtn')}`
+   ]);
+}
+function amsV93Anotar_(p,tipo,etiqueta,usuario,fecha){
+ const key=tipo==='food'?'amsFoodEvents':'amsLodgingEvents';
+ if(!Array.isArray(p[key]))p[key]=[];
+ p[key].push({label:etiqueta,by:usuario,at:fecha});
+ // Respeta cargas antiguas donde la auditoría se guardó como texto.
+ const summary=tipo==='food'?'amsFoodAudit':'amsLodgingAudit';
+ if(typeof p[summary]==='string'&&p[summary].trim())p[summary]+=' | '+[etiqueta,usuario,fecha].join(' - ');
+}
+function amsStaySetNumber(input){
+ const p=state.people.find(x=>String(x.id)===input.dataset.id);
+ if(!p)return alert('No se encontró la persona. Actualiza la pantalla.');
+ const value=String(input.value).trim();
+ const i=Number(input.dataset.index),kind=input.dataset.kind;
+ const previous=kind==='room'?Number(p.room)||0:Number(p.meals?.[i])||0;
+ if(!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value))||Number(value)>9999){
+   input.value=String(previous);return alert('Ingresa un número entero de 0 a 9999.');
+ }
+ const n=Number(value);
+ if(n===previous){input.value=String(n);return;}
+ const usuario=String(currentSession()?.name||'').trim();
+ if(!usuario){input.value=String(previous);return alert('Inicia sesión para registrar al responsable.');}
+ const fecha=now();
+ if(kind==='meal'){
+   if(!Number.isInteger(i)||i<0||i>5){input.value=String(previous);return;}
+   if(!Array.isArray(p.meals))p.meals=[0,0,0,0,0,0];
+   // Conservar el día de los registros anteriores cuando no había bitácora.
+   const logs=state.services.filter(x=>String(x.id)===String(p.id));
+   if(!logs.length){
+      for(let k=0;k<6;k++){
+        const total=Number(p.meals[k])||0;
+        if(total>0)state.services.push({id:p.id,date:p.entry||fecha,service:k,delta:total,legacy:true});
+      }
+   }
+   p.meals[i]=n;
+   state.services.push({id:p.id,date:fecha,service:i,delta:n-previous,adjustment:true,by:usuario});
+   if(i<3)amsV93Anotar_(p,'food',['DESAYUNO','ALMUERZO','CENA'][i]+' '+previous+' → '+n,usuario,fecha);
+   addLog('Ajuste de '+['desayuno','almuerzo','cena','agua','gaseosa','galleta'][i]+' '+previous+' → '+n+' · '+p.name+' · '+usuario);
+ }else if(kind==='room'){
+   const oldRoom=String(p.room||'');
+   if(n!==0){
+     if(!isRoom(n)){input.value=String(previous);return alert('Habitación no habilitada (1 a 37).');}
+     if(['clean','reserved'].includes(state.rooms[String(n)])){
+       input.value=String(previous);return alert('Habitación por limpiar o reservada.');
+     }
+     const occupied=state.people.filter(x=>x.id!==p.id&&String(x.room||'')===String(n)&&!x.lodgingExit&&!x.exit).length;
+     if(occupied>=(n===6||n===26?4:2)){
+       input.value=String(previous);return alert('La habitación está en su capacidad máxima.');
+     }
+   }else if(previous!==0&&!confirm('¿Quitar la habitación de '+p.name+'? Se conservará el historial de alojamiento.')){
+     input.value=String(previous);return;
+   }
+   p.room=n?String(n):'';
+   if(oldRoom&&oldRoom!==String(n)){
+     const others=state.people.some(x=>x.id!==p.id&&String(x.room||'')===oldRoom&&!x.lodgingExit&&!x.exit);
+     state.rooms[oldRoom]=others?'occupied':'clean';
+   }
+   if(n){
+     if(!p.lodgingEntry)p.lodgingEntry=fecha;
+     p.lodgingExit='';
+     const hadKit=Array.isArray(p.kit)&&p.kit.some(x=>Number(x)>0);
+     if(!hadKit){
+       p.kit=[1,1,1];
+       state.inventoryMoves.push({date:fecha,type:'kit',room:String(n),person:p.name});
+     }
+     state.rooms[String(n)]='occupied';
+     amsV93Anotar_(p,'stay','HABITACIÓN '+n+(hadKit?'':' + KIT'),usuario,fecha);
+   }else{
+     amsV93Anotar_(p,'stay','CORRECCIÓN: HABITACIÓN RETIRADA',usuario,fecha);
+   }
+   addLog('Habitación '+previous+' → '+n+' · '+p.name+' · '+usuario);
+ }else {input.value=String(previous);return;}
+ save(); // La captura de Supabase se solicita con la misma fila/ID del proveedor.
+ input.value=String(n);
+ input.classList.add('ams-stay-saved');
+ input.title='Valor guardado localmente y enviado a la cola de sincronización';
+}
+function stayPage(){
+ const live=state.people.filter(p=>!p.exit),rows=amsStayRows(live);
+ return head('1.3 ESTADÍA Y SERVICIOS AL PROVEEDOR','Edita Hab. o los consumos directamente en las casillas; confirma con Enter o saliendo de la casilla.')
+  +panel('REGISTRO MASIVO DE CONSUMOS',`<p class="hint">Opcional: selecciona personas y servicios para sumar +1. También puedes escribir el total directamente en la tabla.</p><div class="pills">${['Desayuno','Almuerzo','Cena','Agua','Gaseosa','Galleta'].map((x,i)=>`<label class="pill"><input class="servicecheck" type="checkbox" value="${i}" style="width:auto"> ${x}</label>`).join('')}</div>${btn('Registrar seleccionados','giveServices()')}`)
+  +panel('PERSONAS EN PLANTA',`<div id="stayTable">${table(['✓','Placa','Nombres y apellidos','Celular','Motivo de ingreso','F. ingreso','F. salida','Hab.','Des.','Alm.','Cena','Agua','Gaseosa','Galleta','Estado','Responsable','Acciones'],rows)}</div>`)
+  +panel('REGISTRAR OPERARIOS DE ACOPIO',`<div class="row">${field('DNI *','opdni','8 dígitos')}${field('Nombres y apellidos *','opname')}${select('Autorización *','opauth',['Seleccione','Oscar Cerrón','Kenyi Carvo'])}${select('Motivo de consumo *','opreason',['Seleccione','Proveedor se retiró antes','Separó comida y no llegó','Trabajos operativos'])}</div><br>${btn('Registrar operario','addOperator()')}`);
+}
 let cargoType='';let cargoLines=[{type:'',code:'',description:'',reason:'',quantity:'',unit:'',notes:''}];let editingCargoNumber='';let cargoLastSaved='';let cargoMaterialType='';let cargoProviderDraft={dni:'',name:''};
 const cargoDrivers=['Seleccionar','JHOMAR GARCIA OSPINO','WILDER CONCE YAURI','WILMER ALVARADO ALIAGA','DONALD ZAMBRANO BASURTO'];
 const cargoSampleTypes=['PPO','RI','2RI','3RI','RM','2RM','DIRIMENCIA','DUPLICADO','FACP','REFERENCIAL'];
@@ -1252,4 +1352,19 @@ document.addEventListener('keydown', function(event) {
 </style>
 <script src="./ams-matriz-v92.js?v=9.2"></script>
 <script src="./ams-cloud.js?v=7.2.0"></script>
+<style>
+/* AMS V9.3 - tabla delimitada y editable exclusivamente para el módulo 1.3 */
+#stayTable .scroll{max-width:100%;overflow-x:auto!important;overflow-y:visible}
+#stayTable table{border-collapse:collapse;border-spacing:0;width:max-content;min-width:100%;table-layout:auto;font-size:12px}
+#stayTable th,#stayTable td{border:1px solid #a9bfd1!important;padding:7px 6px!important;vertical-align:middle;text-align:center;white-space:nowrap}
+#stayTable th{background:#16466b;color:white;font-weight:700}
+#stayTable tbody tr:nth-child(2n){background:#f2f7fb}
+#stayTable tbody tr:hover{background:#e8f2fa}
+#stayTable td:nth-child(3){text-align:left;white-space:normal;min-width:170px;max-width:280px}
+#stayTable .ams-stay-numeric{display:block;width:56px;min-width:56px;max-width:56px;height:34px;box-sizing:border-box;margin:auto;padding:3px 4px;text-align:center;font-size:13px;font-weight:600;border:1px solid #8ba8c0;border-radius:5px;background:#fff;color:#133d5e}
+#stayTable .ams-stay-numeric:focus{outline:2px solid #2378bf;border-color:#2378bf;background:#eff9ff}
+#stayTable .ams-stay-numeric.ams-stay-saved{border-color:#1c8c5d;background:#eaf8f0}
+#stayTable td:last-child{white-space:nowrap}
+@media(max-width:700px){#stayTable th,#stayTable td{padding:6px 5px!important}}
+</style>
 </body></html>
